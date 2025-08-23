@@ -1,0 +1,399 @@
+---
+title: "Dynamic Configuration"
+description: "Implement hot updates and dynamic configuration for form fields"
+---
+
+## Overview
+
+Dynamic configuration management is one of the core features of Signals Form, allowing you to dynamically adjust form structure at runtime based on business logic, user interactions, or data changes. Whether it's simple field visibility control or complex nested structure management, it can be handled with ease.
+
+## Core APIs
+
+### `updateFields` - Field Collection Management
+
+Used to manage top-level field collections, supporting complete replacement, incremental updates, and other operations:
+
+```ts
+// Complete replacement of field collection
+form.updateFields(() => [
+  defineField({
+    id: "username",
+    component: Input,
+    label: "Username",
+    props: { placeholder: "Enter username" }
+  }),
+  defineField({
+    id: "email", 
+    component: Input,
+    label: "Email",
+    props: { type: "email", placeholder: "Enter email" }
+  })
+])
+
+// Update based on existing fields
+form.updateFields((currentFields) => [
+  ...currentFields,
+  defineField({
+    id: "phone",
+    component: Input,
+    label: "Phone",
+    props: { placeholder: "Enter phone number" }
+  })
+])
+
+// Conditional field update
+form.updateFields((fields) => 
+  fields.filter(field => field.id !== "temporaryField")
+)
+```
+
+### `updateProperties` - Nested Field Management
+
+Specifically used for managing sub-properties of object fields and array fields:
+
+```ts
+// Complete reset of sub-fields
+handler.updateProperties(() => [
+  defineField({
+    id: "user.profile.name",
+    component: Input,
+    label: "Name"
+  }),
+  defineField({
+    id: "user.profile.avatar",
+    component: ImageUpload,
+    label: "Avatar"
+  })
+])
+
+// Update based on existing sub-fields
+handler.updateProperties((currentProperties) => 
+  currentProperties.map(field => {
+    if (field.id === 'user.profile.name') {
+      return {
+        ...field,
+        props: { 
+          ...field.props,
+          placeholder: "Enter full name" 
+        }
+      }
+    }
+    return field
+  })
+)
+```
+
+## Practical Scenarios
+
+### 1. Progressive Form Building
+
+Building multi-step forms with dynamic field addition at each step:
+
+```ts title="Multi-step Registration Form"
+interface RegistrationStep {
+  title: string
+  fields: FieldConfig[]
+}
+
+const registrationSteps: Record<string, RegistrationStep> = {
+  basic: {
+    title: "Basic Information",
+    fields: [
+      defineField({
+        id: "username",
+        component: Input,
+        label: "Username",
+        validation: { required: true, minLength: 3 }
+      }),
+      defineField({
+        id: "email",
+        component: Input,
+        label: "Email",
+        props: { type: "email" },
+        validation: { required: true, email: true }
+      })
+    ]
+  },
+  profile: {
+    title: "Personal Profile",
+    fields: [
+      defineField({
+        id: "profile.fullName",
+        component: Input,
+        label: "Full Name"
+      }),
+      defineField({
+        id: "profile.birthday",
+        component: DatePicker,
+        label: "Birthday"
+      }),
+      defineField({
+        id: "profile.avatar",
+        component: ImageUpload,
+        label: "Avatar"
+      })
+    ]
+  },
+  preferences: {
+    title: "Preferences",
+    fields: [
+      defineField({
+        id: "preferences.newsletter",
+        component: Checkbox,
+        label: "Subscribe to newsletter"
+      }),
+      defineField({
+        id: "preferences.language",
+        component: Select,
+        label: "Language Preference",
+        props: {
+          options: [
+            { label: "Chinese", value: "zh-CN" },
+            { label: "English", value: "en-US" }
+          ]
+        }
+      })
+    ]
+  }
+}
+
+// Step switching logic
+function goToStep(stepName: keyof typeof registrationSteps) {
+  const step = registrationSteps[stepName]
+  
+  // Update form title
+  setFormTitle(step.title)
+  
+  // Dynamically update fields
+  form.updateFields(() => step.fields)
+  
+  // If it's profile step, manage nested fields
+  if (stepName === 'profile') {
+    const profileField = form.getField('profile')
+    profileField?.updateProperties(() => [
+      defineField({
+        id: "profile.fullName",
+        component: Input,
+        label: "Full Name",
+        validation: { required: true }
+      }),
+      defineField({
+        id: "profile.birthday",
+        component: DatePicker,
+        label: "Birthday"
+      })
+    ])
+  }
+}
+```
+
+### 2. Permission-Driven Field Management
+
+Dynamically show/hide fields based on user permissions:
+
+```ts title="Permission-Controlled Form"
+interface UserPermissions {
+  canEditProfile: boolean
+  canViewFinancial: boolean
+  isAdmin: boolean
+}
+
+function updateFormByPermissions(permissions: UserPermissions) {
+  const baseFields = [
+    defineField({
+      id: "name",
+      component: Input,
+      label: "Name",
+      props: { disabled: !permissions.canEditProfile }
+    }),
+    defineField({
+      id: "email",
+      component: Input,
+      label: "Email",
+      props: { disabled: !permissions.canEditProfile }
+    })
+  ]
+
+  // Add additional fields based on permissions
+  const conditionalFields = []
+
+  if (permissions.canViewFinancial) {
+    conditionalFields.push(
+      defineField({
+        id: "financial",
+        component: ObjectField,
+        label: "Financial Information",
+        properties: [
+          defineField({
+            id: "financial.salary",
+            component: NumberInput,
+            label: "Salary"
+          }),
+          defineField({
+            id: "financial.bankAccount",
+            component: Input,
+            label: "Bank Account"
+          })
+        ]
+      })
+    )
+  }
+
+  if (permissions.isAdmin) {
+    conditionalFields.push(
+      defineField({
+        id: "adminSettings",
+        component: ObjectField,
+        label: "Admin Settings",
+        properties: [
+          defineField({
+            id: "adminSettings.role",
+            component: Select,
+            label: "Role",
+            props: {
+              options: [
+                { label: "Super Admin", value: "super" },
+                { label: "Admin", value: "admin" }
+              ]
+            }
+          })
+        ]
+      })
+    )
+  }
+
+  // Update form fields
+  form.updateFields(() => [...baseFields, ...conditionalFields])
+}
+
+// Auto-update when permissions change
+defineReaction({
+  dependencies: [userPermissions],
+  update: ([permissions]) => {
+    updateFormByPermissions(permissions)
+  }
+})
+```
+
+### 3. Conditional Configuration Form
+
+Dynamically build forms based on configuration type:
+
+```ts title="Service Configuration Form"
+interface ServiceConfig {
+  type: 'database' | 'api' | 'cache' | 'storage'
+  [key: string]: any
+}
+
+const configTemplates = {
+  database: {
+    title: "Database Configuration",
+    fields: [
+      defineField({
+        id: "config.host",
+        component: Input,
+        label: "Host Address",
+        validation: { required: true }
+      }),
+      defineField({
+        id: "config.port",
+        component: NumberInput,
+        label: "Port",
+        props: { min: 1, max: 65535 }
+      }),
+      defineField({
+        id: "config.database",
+        component: Input,
+        label: "Database Name",
+        validation: { required: true }
+      }),
+      defineField({
+        id: "config.credentials",
+        component: ObjectField,
+        label: "Credentials",
+        properties: [
+          defineField({
+            id: "config.credentials.username",
+            component: Input,
+            label: "Username"
+          }),
+          defineField({
+            id: "config.credentials.password",
+            component: PasswordInput,
+            label: "Password"
+          })
+        ]
+      })
+    ]
+  },
+  api: {
+    title: "API Configuration",
+    fields: [
+      defineField({
+        id: "config.baseUrl",
+        component: Input,
+        label: "Base URL",
+        props: { type: "url" }
+      }),
+      defineField({
+        id: "config.timeout",
+        component: NumberInput,
+        label: "Timeout (ms)",
+        props: { min: 1000, max: 30000 }
+      }),
+      defineField({
+        id: "config.headers",
+        component: KeyValueEditor,
+        label: "Headers"
+      })
+    ]
+  },
+  cache: {
+    title: "Cache Configuration", 
+    fields: [
+      defineField({
+        id: "config.ttl",
+        component: NumberInput,
+        label: "TTL (seconds)"
+      }),
+      defineField({
+        id: "config.maxSize",
+        component: NumberInput,
+        label: "Max Size (MB)"
+      })
+    ]
+  }
+}
+
+// Update configuration fields based on service type
+defineReaction({
+  field: form.serviceType,
+  update: (handler, serviceType) => {
+    const template = configTemplates[serviceType as keyof typeof configTemplates]
+    
+    if (template) {
+      // Update configuration fields
+      const configField = form.getField('config')
+      configField?.updateProperties(() => template.fields)
+      
+      // Update form title
+      setFormTitle(template.title)
+      
+      // Clear old configuration values
+      form.setFieldValue('config', {})
+    }
+  }
+})
+```
+
+## Summary
+
+Dynamic configuration management is the core capability for building flexible form systems. By properly using `updateFields`, `updateProperties`, and `updatePartialProperties`, combined with type safety and performance optimization strategies, you can build powerful and efficient dynamic form systems.
+
+Remember the key principles:
+- 🎯 **Clear Intent**: Choose the appropriate update method
+- 🚀 **Performance First**: Batch operations, avoid frequent updates
+- 🔒 **Type Safety**: Use TypeScript to constrain field paths
+- 🎨 **User Experience**: Smooth transitions and responsive updates
+
+Master these techniques and you'll be able to handle various complex dynamic form scenarios! ✨

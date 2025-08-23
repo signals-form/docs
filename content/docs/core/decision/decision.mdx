@@ -1,0 +1,34 @@
+---
+title: Decision Object
+description: Conditional rendering and logical judgment in form systems
+---
+
+`Decision` is a decision object commonly used for field display/hiding and business logic processing.
+
+## Basic Usage
+```ts
+import { setup, D } from "@signals-form/core"
+
+const boolConfig = {
+  isDisabled: false,
+  isHidden: () => true,
+  isA:(model) => model.data === 'a',
+}
+
+// Register boolean configuration
+setup(boolConfig)
+
+const ds = D.and(
+  D.or(
+    'isDisabled',
+    'isHidden'
+  ),
+  D.use('isA')
+)
+
+const model = {
+  data: 'a'
+}
+
+ds.execute(model) // true
+```

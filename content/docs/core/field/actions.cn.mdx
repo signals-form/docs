@@ -1,0 +1,70 @@
+---
+title: 值行为
+description: 字段在表单中的值行为
+---
+
+`actions` 是一个对象，它定义了字段的行为。有两个属性 `onDefaultValue` , `onSubmitValue` 。
+
+## onDefaultValue
+- `onDefaultValue` 是一个函数，也可以是一个对象，它用于设置字段的默认值。
+- 如果是一个对象，它应该包含一个 `dependencies` 属性以及 `handler`，用于指定默认值。
+  - `dependencies` 是一个数组，用于指定依赖的字段。
+  - `handler` 是一个函数，用于计算默认值。第一个参数为 字段的初始值，第二个参数为 依赖项的值集合。
+
+```ts
+// only function
+const username = defineField({
+  id: "username",
+  component: Input,
+  initialValue: "initialValue",
+  actions: {
+    onDefaultValue: (value) => "default value",
+  }
+})
+
+// dependencies
+const username = defineField({
+  id: "username",
+  component: Input,
+  initialValue: "initialValue",
+  actions: {
+    onDefaultValue:{
+      dependencies: ["otherField"],
+      handler: (initialValue, [otherFieldValue]) => {
+        return otherFieldValue ? "default value" : initialValue;
+      }
+    },
+  }
+})
+```
+
+## onSubmitValue
+- `onSubmitValue` 是一个函数，也可以是一个对象，它用于设置字段的提交值。
+- 如果是一个对象，它应该包含一个 `dependencies` 属性以及 `handler`，用于指定提交值。
+  - `dependencies` 是一个数组，用于指定依赖的字段。
+  - `handler` 是一个函数，用于转化提交的值。第一个参数为 字段的初始值，第二个参数为 依赖项的值集合。
+
+```ts
+// only function
+const username = defineField({
+  id: "username",
+  component: Input,
+  actions: {
+    onSubmitValue: (value) => value
+  }
+})
+
+// dependencies
+const username = defineField({
+  id: "username",
+  component: Input,
+  actions: {
+    onSubmitValue: {
+      dependencies: ["otherField"],
+      handler: (value, [otherFieldValue]) => {
+        return !otherFieldValue ? "default submit value" : String(value).toUpperCase();
+      }
+    }
+  }
+})
+```

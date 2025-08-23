@@ -1,0 +1,10 @@
+{
+  "title": "开发者工具",
+  "description": "Signals Form 的开发者工具",
+  "icon": "DraftingCompass",
+  "root": true,
+  "pages": [
+    "---Introduction---",
+    "index"
+  ]
+} 

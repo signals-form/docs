@@ -1,0 +1,89 @@
+---
+title: 创建表单
+---
+SignalsForm 支持多框架，不管是 `react` 或者 `vue`,或者其他的框架，均可支持，且学习一套Api，可以多框架支持。
+
+- `defineForm` 可以将各个元素，例如 字段、组件、校验器、联动关系等，组合成一个完整的表单系统。
+
+`defineForm` 接收一个配置对象，主要包含以下属性：
+
+- id：表单唯一 id。
+- defaultValidatorEngine：表单的默认引擎，其值为 `resolvers` 中注册的校验引擎。
+- fields：表单所具有的字段集合，是一个数组类型。
+
+## boolConfig
+- 对表单注入中心化的布尔值配置，与决策进行搭配使用。
+- 是一个对象，其中key，为决策的参数，Value为决策真正要执行的行为，此行为可以是一个直接的 bool，或者一个函数，或者是一个 计算属性，此行为具备访问表单模型的能力。
+
+```ts
+const boolConfig = {
+    isTom: (model) => model.username === 'Tom',
+    is18： (model) => model.age >= 18,
+}
+
+defineField({
+    ...
+    hidden: D.not('is18') // 当用户的年龄小于18岁时，此字段需要隐藏
+})
+
+defineForm({
+    ...
+    boolConfig
+})
+```
+
+## resolvers
+- 表单所需要的解析器集合，用于增强表单能力
+
+### validator
+- 校验器注册
+```ts
+resolvers:{ 
+    validator: {
+      zod: ZodResolver,
+    }
+  }
+```
+
+### components
+- 组件注册器
+- 当字段中的 `component` 属性为一个字符串时，表示使用注册的组件。
+```ts
+const username = defineField<string, Props>({
+  id: "username",
+  component: "Input",
+})
+
+const form = defineForm({
+  id: "Login",
+  defaultValidatorEngine: "zod",
+  fields: [
+    username,
+  ],
+  resolvers:{ 
+    validator: {
+      zod: ZodResolver,
+    },
+    components:{
+      Input: InputComponent,
+    }
+  }
+})
+```
+
+- basicFieldConfig： 此属性，可以设置字段的默认配置，目前仅支持设置 activityOnHidden、recoverValueOnShown、removeValueOnHidden、events。
+  - events可以统一给字段添加事件，如果字段已经含有这个事件，此时以字段自己注册的事件为准。
+
+## activity
+- activity是一个函数，此函数必须返回对应框架的虚拟Dom，搭配字段中，activityOnHidden 属性，为true时，此组件即可为字段组件的父组件，做一些保活的动作，但也存在一定的心智负担，因对字段渲染时，会加入一些额外的Dom，因此默认是关闭的，需要开发者明确需要。<br/>
+示例：
+```tsx
+{
+  activity: ({ hidden, children }) => {
+    return <div hidden={hidden}>
+      {children}
+    </div>
+  }
+}
+```
+

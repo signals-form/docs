@@ -1,0 +1,357 @@
+---
+title: 受控联动
+description: 定义受控联动关系，实现可中断的线性执行
+---
+
+## 概述
+
+`defineRelation` 用于定义受控联动关系，解决了传统联动的痛点：
+
+- ✅ **线性执行** - 避免多次重复执行
+- ✅ **可中断更新** - 自动取消过期的异步操作
+- ✅ **执行顺序可预测** - 按依赖关系顺序执行
+- ✅ **异步友好** - 原生支持 Promise 和 AbortSignal
+
+## 核心特性对比
+
+| 特性 | 普通联动 | 受控联动 |
+|------|----------|----------|
+| 执行顺序 | 不确定 | 线性执行 |
+| 重复执行 | 可能多次 | 避免重复 |
+| 异步中断 | 不支持 | 自动中断 |
+| 性能 | 一般 | 优秀 |
+
+## 基础用法
+
+```ts
+import { defineRelation } from '@signals-form/core'
+
+const relation = defineRelation({
+  field: targetField,           // 目标字段
+  dependencies: [sourceField],  // 依赖字段
+  update: (handler, values) => {
+    // 更新逻辑
+    return values[0] + handler.value
+  }
+})
+```
+
+## API 参数
+
+### 配置对象
+
+| 参数 | 类型 | 必填 | 描述 |
+|------|------|------|------|
+| `field` | `Field` | ✅ | 目标字段（被联动的字段） |
+| `dependencies` | `Field \| string[]` | ✅ | 依赖字段（触发联动的字段） |
+| `update` | `UpdateFunction` | ✅ | 联动更新函数 |
+| `options` | `Options` | ❌ | 配置选项 |
+
+### 选项配置 (options)
+
+| 选项 | 类型 | 默认值 | 描述 |
+|------|------|--------|------|
+| `isImmediate` | `boolean` | `false` | 是否立即执行（初始化时就触发） |
+| `once` | `boolean` | `false` | 是否只执行一次 |
+| `dirtyIgnore` | `boolean` | `false` | 是否忽略脏值更新（总是执行更新） |
+
+### 更新函数
+
+```ts
+type UpdateFunction = (
+  handler: FieldHandler,        // 目标字段的操作句柄
+  values: any | any[],         // 依赖字段的值（单个或数组）
+  abortSignal?: AbortSignal    // 取消信号
+) => any | Promise<any>
+```
+
+## 线性执行机制
+
+### 执行顺序保证
+
+当 `a` 字段变化时，联动执行顺序为：`a → c → d → e`
+
+<Mermaid chart="graph LR
+    A[a 字段变化] --> C[c 字段更新]
+    A --> D[d 字段更新]
+    C --> E[e 字段更新]
+    D --> E"/>
+
+```ts title="线性执行示例"
+// a 变化 → c 更新
+defineRelation({
+  field: c,
+  dependencies: a,
+  update: () => {
+    return Math.floor(Math.random() * 100)
+  }
+})
+
+// a 变化 → d 更新（异步）
+defineRelation({
+  field: d,
+  dependencies: a,
+  update: () => {
+    return new Promise(resolve => {
+      setTimeout(() => {
+        resolve(String(Math.floor(Math.random() * 100)))
+      }, 1000)
+    })
+  }
+})
+
+// c, d 都变化 → e 更新
+defineRelation({
+  field: e,
+  dependencies: [c, d],
+  update: (handler, [cValue, dValue]) => {
+    const aValue = handler.query("***.a").value
+    return `a: ${aValue}, c: ${cValue}, d: ${dValue}`
+  }
+})
+```
+
+### 避免重复执行
+
+普通联动中，`a` 变化后 `e` 会被更新两次（因为 `c` 和 `d` 都会触发 `e`）。
+
+受控联动中，`e` 只会在所有依赖更新完成后执行一次。
+
+## 可中断执行
+
+### 中断机制
+
+当依赖字段再次变化时，未完成的异步更新会被自动中断：
+
+```ts title="中断示例"
+defineRelation({
+  field: result,
+  dependencies: searchInput,
+  update: async (handler, [keyword], abortSignal) => {
+    // 监听中断事件
+    abortSignal?.addEventListener("abort", () => {
+      console.log("搜索请求被中断")
+    })
+
+    try {
+      // 可中断的异步请求
+      const response = await fetch(`/api/search?q=${keyword}`, {
+        signal: abortSignal
+      })
+      
+      if (abortSignal?.aborted) return
+      
+      const data = await response.json()
+      return data.results
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        console.log('请求被取消')
+      } else {
+        console.error('搜索失败:', error)
+      }
+    }
+  }
+})
+```
+
+### 中断场景
+
+<Mermaid chart='sequenceDiagram
+    participant User as 用户
+    participant Field as 字段
+    participant Update as 更新函数
+    
+    User->>Field: 输入 "abc"
+    Field->>Update: 开始异步更新
+    Note over Update: 正在执行...
+    User->>Field: 输入 "abcd"
+    Field->>Update: 发送中断信号
+    Note over Update: 取消前一次更新
+    Field->>Update: 开始新的更新'/>
+
+
+## 实际示例
+
+### 基础联动
+
+```ts title="用户名跟随角色变化"
+const usernameRelation = defineRelation({
+  field: username,
+  dependencies: role,
+  update: (handler, roleValue) => {
+    if (roleValue === 'admin') {
+      return 'administrator'
+    }
+    return `user_${Date.now()}`
+  }
+})
+```
+
+### 异步数据获取
+
+```ts title="根据城市获取区域"
+const districtRelation = defineRelation({
+  field: district,
+  dependencies: city,
+  update: async (handler, cityId, abortSignal) => {
+    if (!cityId) {
+      handler.setState('options', [])
+      return ''
+    }
+
+    try {
+      const districts = await fetchDistricts(cityId, { 
+        signal: abortSignal 
+      })
+      
+      // 检查是否已被中断
+      if (abortSignal?.aborted) return
+      
+      handler.setState('options', districts)
+      return districts[0]?.value || ''
+    } catch (error) {
+      if (error.name !== 'AbortError') {
+        console.error('获取区域失败:', error)
+      }
+    }
+  }
+})
+```
+
+### 多字段依赖
+
+```ts title="价格计算"
+const totalRelation = defineRelation({
+  field: total,
+  dependencies: [price, quantity, discount],
+  update: (handler, [price, quantity, discount]) => {
+    const subtotal = (price || 0) * (quantity || 0)
+    const discountAmount = subtotal * ((discount || 0) / 100)
+    return Math.round((subtotal - discountAmount) * 100) / 100
+  },
+  options: {
+    isImmediate: true  // 初始化时计算
+  }
+})
+```
+
+### 防抖搜索
+
+```ts title="搜索防抖"
+const searchRelation = defineRelation({
+  field: searchResults,
+  dependencies: keyword,
+  update: async (handler, keyword, abortSignal) => {
+    if (!keyword?.trim()) {
+      return []
+    }
+
+    // 防抖延迟
+    await new Promise(resolve => setTimeout(resolve, 300))
+    
+    if (abortSignal?.aborted) return
+
+    try {
+      const results = await searchAPI(keyword, { 
+        signal: abortSignal 
+      })
+      return results
+    } catch (error) {
+      if (error.name !== 'AbortError') {
+        console.error('搜索失败:', error)
+        return []
+      }
+    }
+  }
+})
+```
+
+## 高级特性
+
+### 返回值处理
+
+```ts
+defineRelation({
+  field: targetField,
+  dependencies: sourceField,
+  update: (handler, value) => {
+    // 1. 直接返回值 - 自动设置到 field.value
+    return processedValue
+    
+    // 2. 返回 Promise - 等待异步完成
+    return Promise.resolve(asyncValue)
+    
+    // 3. 手动控制 - 不返回值或返回 undefined
+    handler.setState('value', customValue)
+    handler.setState('disabled', true)
+    // 不返回任何值
+  }
+})
+```
+
+### 条件执行
+
+```ts
+defineRelation({
+  field: conditionalField,
+  dependencies: triggerField,
+  update: (handler, value) => {
+    // 条件判断
+    if (!shouldUpdate(value)) {
+      return // 不执行更新
+    }
+    
+    return processValue(value)
+  },
+  options: {
+    dirtyIgnore: true  // 忽略脏值检查
+  }
+})
+```
+## 类型定义
+
+```ts
+
+export interface Relation<
+	T = any,
+	P extends Props = Props,
+	E extends string = string,
+	D extends Dependencies = any,
+> {
+	/** The field being reacted to */
+	field: Dependency<T, P, E>;
+	/** The dependencies of the reaction */
+	dependencies: [...D];
+	/**
+	 * The update function is called when the dependencies change.
+	 * It should return a value that will be used to update the field.
+	 * If the update function returns a promise, it will be awaited before updating the field.
+	 * @param handler - The field handler
+	 * @param depValues - The values of the dependencies
+	 * @param signal - The abort signal
+	 */
+	update: (
+		handler: FieldHandler<T, P>,
+		depValues: GetDependencyValues<D>,
+		signal: AbortSignal,
+	) => void | Promise<void | T> | T | Promise<T>;
+	options?: {
+		/** If true, the reaction will only be triggered once */
+		once?: boolean;
+		/** If true, the reaction will be triggered immediately */
+		immediate?: boolean;
+		/** If true, the reaction will be allowed to skip updates multiple times, default is false */
+		dirtyIgnore?: boolean;
+		// support for debounce and throttle ?
+	};
+}
+```
+
+## 性能优化
+
+1. **合理设置依赖** - 只依赖真正需要的字段
+2. **使用 AbortSignal** - 及时取消无效的异步操作
+3. **避免循环依赖** - 检查字段依赖关系图
+4. **适当使用 dirtyIgnore** - 在需要时忽略脏值检查
+
+受控联动是 Signals Form 的核心特性，让复杂的字段关系变得简单可控！✨

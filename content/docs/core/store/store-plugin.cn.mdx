@@ -1,0 +1,303 @@
+---
+title: 插件系统
+description: 扩展 Store 功能，实现插件化架构
+---
+
+## 概述
+
+Store 插件系统允许你通过插件扩展 Store 的功能，实现更强大和灵活的状态管理。
+
+## 插件能力
+
+插件可以为 Store 提供以下扩展能力：
+
+- ✅ **添加新属性** - 为 store 实例添加自定义属性
+- ✅ **扩展配置选项** - 在 `defineStore` 时增加新的选项
+- ✅ **增加新方法** - 为 store 添加自定义方法
+- ✅ **包装现有方法** - 对原有方法进行增强或修改
+- ✅ **拦截操作** - 改变甚至取消 action 的执行
+- ✅ **实现副作用** - 如本地存储、日志记录等
+- ✅ **条件应用** - 仅对特定 store 应用插件
+
+## 基础用法
+
+### 注册插件
+
+```ts
+import { defineStore, registerPlugin } from "@signals-form/store"
+import { createPersistPlugin } from "@signals-form/store/plugins"
+
+// 全局注册插件
+registerPlugin(createPersistPlugin({
+  // 插件基础配置
+  storage: localStorage,
+  key: 'signals-form-store'
+}))
+```
+
+### 使用插件功能
+
+```ts
+const useCounterStore = defineStore('counter', () => {
+  const counter = signal(100)
+  const name = signal('cherry')
+  
+  function increment() {
+    counter.value += 1
+  }
+  
+  function decrement() {
+    counter.value -= 1
+  }
+  
+  return {
+    counter,
+    name,
+    increment,
+    decrement
+  }
+}, {
+  persist: true  // 启用持久化插件功能
+})
+
+// 使用 store
+const { increment, counter } = useCounterStore()
+
+increment()  // counter: 101
+increment()  // counter: 102
+increment()  // counter: 103
+
+console.log(counter.value)  // 103，并且会自动保存到 localStorage
+```
+
+## 内置插件
+
+### 持久化插件
+
+最常用的插件是持久化插件，用于将 store 状态保存到本地存储：
+
+```ts
+import { createPersistPlugin } from "@signals-form/store/plugins"
+
+registerPlugin(createPersistPlugin({
+  storage: localStorage,        // 存储方式
+  key: 'app-store',            // 存储键名前缀
+  serializer: {                // 序列化配置
+    serialize: JSON.stringify,
+    deserialize: JSON.parse
+  }
+}))
+
+// 在 store 中使用
+const useUserStore = defineStore('user', () => {
+  const profile = signal({ name: '', email: '' })
+  const preferences = signal({ theme: 'light' })
+  
+  return { profile, preferences }
+}, {
+  persist: {
+    key: 'user-data',                    // 自定义存储键名
+    paths: ['profile'],                  // 只持久化指定路径
+    storage: sessionStorage,             // 使用 sessionStorage
+    beforeRestore: (context) => {       // 恢复前的钩子
+      console.log('准备恢复状态:', context)
+    },
+    afterRestore: (context) => {        // 恢复后的钩子
+      console.log('状态恢复完成:', context)
+    }
+  }
+})
+```
+
+### 开发调试插件
+
+开发环境下的调试插件：
+
+```ts
+import { createDevtoolsPlugin } from "@signals-form/store/plugins"
+
+if (process.env.NODE_ENV === 'development') {
+  registerPlugin(createDevtoolsPlugin({
+    logMutations: true,          // 记录状态变更
+    logActions: true,            // 记录 action 调用
+    logTimestamp: true,          // 添加时间戳
+    maxLogEntries: 100          // 最大日志条数
+  }))
+}
+```
+
+## 自定义插件
+
+### 创建简单插件
+
+```ts title="日志插件"
+import type { StorePlugin } from "@signals-form/store"
+
+const loggerPlugin: StorePlugin = ({ store, options }) => {
+  // 为 store 添加新方法
+  store.$log = (message: string) => {
+    console.log(`[${store.$id}] ${message}`)
+  }
+  
+  // 包装现有方法
+  const originalPatch = store.$patch
+  store.$patch = (partialStateOrMutator) => {
+    console.log(`[${store.$id}] 开始更新状态`)
+    const result = originalPatch.call(store, partialStateOrMutator)
+    console.log(`[${store.$id}] 状态更新完成`)
+    return result
+  }
+  
+  // 订阅状态变化
+  store.$subscribe((mutation, state) => {
+    console.log(`[${store.$id}] 状态变化:`, mutation.type, mutation.payload)
+  })
+}
+
+// 注册插件
+registerPlugin(loggerPlugin)
+```
+
+### 高级插件示例
+
+```ts title="撤销重做插件"
+interface UndoRedoOptions {
+  maxHistorySize?: number
+}
+
+function createUndoRedoPlugin(options: UndoRedoOptions = {}): StorePlugin {
+  const { maxHistorySize = 50 } = options
+  
+  return ({ store, options: storeOptions }) => {
+    // 只对启用了 undoRedo 选项的 store 生效
+    if (!storeOptions.undoRedo) return
+    
+    const history: any[] = []
+    const redoStack: any[] = []
+    let currentIndex = -1
+    
+    // 添加撤销重做方法
+    store.$undo = () => {
+      if (currentIndex > 0) {
+        redoStack.push(store.$state)
+        currentIndex--
+        store.$patch(history[currentIndex])
+      }
+    }
+    
+    store.$redo = () => {
+      if (redoStack.length > 0) {
+        const state = redoStack.pop()!
+        currentIndex++
+        history[currentIndex] = state
+        store.$patch(state)
+      }
+    }
+    
+    store.$canUndo = () => currentIndex > 0
+    store.$canRedo = () => redoStack.length > 0
+    
+    // 记录状态历史
+    store.$subscribe((mutation, state) => {
+      // 清除重做栈
+      redoStack.length = 0
+      
+      // 添加到历史记录
+      history.push(JSON.parse(JSON.stringify(state)))
+      currentIndex++
+      
+      // 限制历史记录大小
+      if (history.length > maxHistorySize) {
+        history.shift()
+        currentIndex--
+      }
+    })
+    
+    // 初始状态
+    history.push(JSON.parse(JSON.stringify(store.$state)))
+    currentIndex = 0
+  }
+}
+
+// 注册插件
+registerPlugin(createUndoRedoPlugin({ maxHistorySize: 100 }))
+
+// 使用插件
+const useFormStore = defineStore('form', () => {
+  const formData = signal({ name: '', email: '' })
+  return { formData }
+}, {
+  undoRedo: true  // 启用撤销重做功能
+})
+
+const { $undo, $redo, $canUndo } = useFormStore()
+```
+
+## 插件 API
+
+### 插件接口
+
+```ts
+interface StorePlugin {
+  (context: {
+    store: Store           // store 实例
+    app?: App             // 应用实例（如果有）
+    options: any          // store 的选项配置
+  }): void
+}
+```
+
+### Store 扩展方法
+
+插件可以为 store 添加以下类型的方法：
+
+```ts
+// 扩展 Store 接口
+declare module '@signals-form/store' {
+  interface Store {
+    // 自定义方法
+    $log?(message: string): void
+    $undo?(): void
+    $redo?(): void
+    $canUndo?(): boolean
+    $canRedo?(): boolean
+  }
+}
+```
+
+## 条件应用插件
+
+### 基于 Store ID
+
+```ts
+const conditionalPlugin: StorePlugin = ({ store }) => {
+  // 只对特定名称的 store 应用
+  if (store.$id.startsWith('form-')) {
+    // 添加表单特定的功能
+    store.$validate = () => {
+      // 验证逻辑
+    }
+  }
+}
+```
+
+### 基于选项配置
+
+```ts
+const optionalPlugin: StorePlugin = ({ store, options }) => {
+  // 只对配置了特定选项的 store 应用
+  if (options.enablePlugin) {
+    // 应用插件功能
+  }
+}
+```
+
+## 注意事项
+
+1. **插件顺序**：插件按注册顺序执行，后注册的插件会覆盖先注册的同名方法
+2. **性能影响**：插件会在每个 store 创建时执行，避免在插件中进行重操作
+3. **类型安全**：扩展 Store 接口时要正确声明类型
+4. **条件应用**：合理使用条件判断，避免不必要的插件逻辑执行
+5. **清理资源**：插件创建的订阅和定时器需要在适当时机清理
+
+插件系统让 Store 具备了无限的扩展可能，让你的状态管理更加强大和灵活！✨

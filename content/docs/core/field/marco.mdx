@@ -1,0 +1,62 @@
+---
+title: "State Macros"
+description: State macros for props binding
+---
+
+State syntax specifically prepared for `props`, you can use state macros to bind `prop` with external `Signal` objects.
+
+- There are two types of state macros: `$bind` for one-way binding, and `$model` for two-way binding.
+
+### $bind
+- `$bind` is one-way binding. When the `signal` updates, the `prop` will also update accordingly.
+- The parameter of $bind can be a `Computed` object, a `Signal` object, or a function.
+- **Note**: During one-way binding, setting the `prop` value in the field's `handler` will cause an error, because for the field, the prop is a read-only value at this time.
+
+```ts
+import { defineField, $bind } from "@signals-form/core"
+import { signal } from "alien-deepSignals"
+
+const label = signal('username')
+
+const username = defineField({
+  id: "username",
+  component: Input,
+  props: {
+    label: $bind(label)
+  },
+  events: {
+    onChange(value){
+      this.setState("label", value) // ❌ This property is bound via $bind and is read-only. Use the source field's setState/setAsyncState methods instead.
+    }
+ }
+})
+```
+
+### $model
+- `$model` is two-way binding. When either `prop` or `signal` triggers an update, both will update.
+- The parameter of $model can be a `Signal` object, or a function that returns a `Signal` object.
+
+```ts
+import { defineField, $model } from "@signals-form/core"
+import { signal } from "alien-deepsignals"
+
+const label = signal('username')
+
+const username = defineField({
+  id: "username",
+  component: Input,
+  props: {
+    label: $model(label)
+  },
+ events: {
+   onChange(value){
+      this.setState('value', value)
+      this.setState('label', value) // Can update the label signal value
+   }
+ }
+})
+
+setTimeout(() => {
+  label.value = 'Username' // Update the label signal value
+}, 1000);
+```

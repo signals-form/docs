@@ -1,0 +1,267 @@
+---
+title: Basic Reactions
+description: Define field dependencies and implement reactive data flow
+---
+
+## Overview
+
+`defineReaction` is used to define reactive relationships between fields. When dependency fields change, it automatically triggers update logic for target fields.
+
+## Basic Usage
+
+```ts
+import { defineReaction } from '@signals-form/core'
+
+const reaction = defineReaction({
+  field: targetField,           // Target field
+  dependencies: [sourceField],  // Array of dependency fields
+  update: (handler, values) => {
+    // Update logic
+    handler.setState('value', values[0])
+  }
+})
+```
+
+## API Parameters
+
+### Configuration Object
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `field` | `Field\|string` | ✅ | Target field (the field being updated) |
+| `dependencies` | `(Field\|string)[]` | ✅ | Array of dependency fields (fields that trigger updates) |
+| `update` | `UpdateFunction` | ✅ | Update function for reactive behavior |
+| `options` | `Options` | ❌ | Configuration options |
+
+### Options Configuration
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `immediate` | `boolean` | `false` | Whether to execute immediately (trigger on initialization) |
+| `once` | `boolean` | `false` | Whether to execute only once |
+| `dirtyIgnore` | `boolean` | `false` | Whether to ignore dirty value checks (skip duplicate execution optimization) |
+
+### Update Function
+
+```ts
+type UpdateFunction = (
+  handler: FieldHandler,     // Handler for the target field
+  values: any[],            // Array of dependency field values
+  abortSignal: AbortSignal  // Cancellation signal
+) => void | Promise<any>
+```
+
+### Automatic Dependency Collection
+
+`defineReaction` supports functional calls with automatic dependency collection:
+
+```ts
+const reaction = defineReaction((handler) => {
+  // Automatically collect dependencies
+  const usernameHandler = handler.query('username')
+  const password = handler.query('password').value
+
+  // Execute logic based on dependency values
+  if (password === 'admin') {
+    usernameHandler.setState('value', username + '_admin')
+  }
+})
+```
+
+## Practical Examples
+
+### Basic Reaction
+
+```ts title="Username follows password changes"
+const usernameReaction = defineReaction({
+  field: username,
+  dependencies: [password],
+  update: (handler, [passwordValue]) => {
+    if (passwordValue === 'admin') {
+      handler.setState('value', 'administrator')
+    }
+  }
+})
+```
+
+### Async Reaction
+
+```ts title="Fetch districts based on city"
+const districtReaction = defineReaction({
+  field: district,
+  dependencies: [city],
+  update: async (handler, [cityId], abortSignal) => {
+    if (!cityId) return
+    
+    try {
+      const districts = await fetchDistricts(cityId, { signal: abortSignal })
+      handler.setState('options', districts)
+      handler.setState('value', '') // Reset selected value
+    } catch (error) {
+      if (!abortSignal?.aborted) {
+        console.error('Failed to fetch districts:', error)
+      }
+    }
+  }
+})
+```
+
+### Multi-field Reaction
+
+```ts title="Calculate total price"
+const totalReaction = defineReaction({
+  field: total,
+  dependencies: [price, quantity, discount],
+  update: (handler, [price, quantity, discount]) => {
+    const totalAmount = (price || 0) * (quantity || 0) * (1 - (discount || 0) / 100)
+    handler.setState('value', Math.round(totalAmount * 100) / 100)
+  },
+  options: {
+    immediate: true  // Calculate once on initialization
+  }
+})
+```
+
+### Many-to-Many Reactions
+
+Supports multiple fields updating multiple target fields simultaneously, but use with caution - prefer many-to-one patterns:
+
+```ts title="Many-to-many dependency updates"
+const multiTargetReaction = defineReaction({
+  field: [total1, total2],  // Multiple target fields
+  dependencies: [price, quantity, discount],
+  update: ([handler1, handler2], [price, quantity, discount]) => {
+    const totalAmount = (price || 0) * (quantity || 0) * (1 - (discount || 0) / 100)
+    const roundedTotal = Math.round(totalAmount * 100) / 100
+    
+    handler1.setState('value', roundedTotal)
+    handler2.setState('value', roundedTotal)
+  },
+  options: {
+    immediate: true
+  }
+})
+```
+
+> ⚠️ **Warning**: Minimize many-to-many scenarios. Prefer many-to-one patterns for better maintainability and debugging.
+
+### One-time Reaction
+
+```ts title="Initialize data from URL on startup"
+const initReaction = defineReaction({
+  field: userId,
+  dependencies: [urlParams],
+  update: (handler, [params]) => {
+    if (params?.userId) {
+      handler.setState('value', params.userId)
+    }
+  },
+  options: {
+    once: true,       // Execute only once
+    immediate: true   // Execute immediately
+  }
+})
+```
+
+## Advanced Features
+
+### Dirty Value Check Control
+
+By default, the system skips duplicate updates with identical values for performance optimization. Use `dirtyIgnore` to bypass this optimization:
+
+```ts
+const cacheReaction = defineReaction({
+  field: cache,
+  dependencies: [input],
+  update: (handler, [inputValue]) => {
+    // With dirtyIgnore: true, update executes even with identical input values
+    handler.setState('value', `cached_${inputValue}_${Date.now()}`)
+  },
+  options: {
+    dirtyIgnore: true  // Ignore dirty checks, execute update even with identical values
+  }
+})
+```
+
+**How it works:**
+- `dirtyIgnore: false` (default): Skip update function execution if dependency field values haven't changed
+- `dirtyIgnore: true`: Execute update function regardless of whether dependency field values have changed
+
+### Canceling Async Operations
+
+For async updates, the system automatically provides AbortSignal to cancel outdated requests:
+
+```ts
+const searchReaction = defineReaction({
+  field: searchResults,
+  dependencies: [keyword],
+  update: async (handler, [keyword], abortSignal) => {
+    if (!keyword?.trim()) {
+      handler.setState('value', [])
+      return
+    }
+
+    // Listen for cancellation signal
+    abortSignal?.addEventListener('abort', () => {
+      console.log('Search request was cancelled')
+    })
+
+    try {
+      const results = await searchAPI(keyword, { signal: abortSignal })
+      
+      // Check if already cancelled
+      if (!abortSignal?.aborted) {
+        handler.setState('value', results)
+      }
+    } catch (error) {
+      if (error.name !== 'AbortError') {
+        console.error('Search failed:', error)
+      }
+    }
+  }
+})
+```
+
+## Important Notes
+
+1. **Circular Dependencies**: The system supports circular dependencies, but ensure you don't modify the `value` property in update functions to avoid infinite loops
+2. **Performance Considerations**: Default dirty value checking helps optimize performance. Avoid setting `dirtyIgnore: true` unless necessary (e.g., updates based on timestamps or other dynamic values)
+3. **Async Handling**: For async updates, always handle AbortSignal to prevent memory leaks and race conditions
+4. **Many-to-Many Reactions**: Avoid many-to-many reactive patterns when possible; prefer many-to-one approaches
+
+## Type Definitions
+
+```ts
+export interface Reaction<
+  T = any,
+  P extends Props = Props,
+  E extends string = string,
+  D extends Dependencies = any,
+> {
+  /** Target field */
+  field: Dependency<T, P, E>;
+  /** Array of dependency fields */
+  dependencies: [...D];
+  /**
+   * Update function called when dependencies change
+   * @param handler - Field operation handler
+   * @param depValues - Array of dependency field values
+   * @param signal - Cancellation signal
+   */
+  update: (
+    handler: FieldHandler<T, P>,
+    depValues: GetDependencyValues<D>,
+    signal: AbortSignal,
+  ) => void | Promise<void | T> | T | Promise<T>;
+  options?: {
+    /** Whether to trigger only once */
+    once?: boolean;
+    /** Whether to trigger immediately */
+    immediate?: boolean;
+    /** Whether to ignore dirty value checks, skip duplicate value updates, defaults to false */
+    dirtyIgnore?: boolean;
+  };
+}
+```
+
+Basic reactions are the fundamental reactive pattern, suitable for most scenarios. For more advanced control capabilities, consider using

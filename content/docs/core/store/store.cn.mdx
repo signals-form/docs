@@ -1,0 +1,320 @@
+---
+title: 状态管理
+description: 类 Pinia 的状态管理库，实现跨字段状态共享
+---
+
+## 概述
+
+Store 是一个类似 Pinia 的状态管理库，专为 Signals Form 设计，让你能够在字段之间轻松共享状态。
+
+## 基础用法
+
+### 定义 Store
+
+```ts
+import { defineStore } from '@signals-form/store'
+import { signal, computed } from "alien-deepsignals"
+
+export const useCounterStore = defineStore('counter', () => {
+  // 状态定义
+  const count = signal(0)
+  const name = signal('Counter')
+  
+  // 计算属性
+  const doubleCount = computed(() => count.value * 2)
+  
+  // 操作方法
+  function increment() {
+    count.value++
+  }
+  
+  function decrement() {
+    count.value--
+  }
+  
+  function setName(newName: string) {
+    name.value = newName
+  }
+  
+  return {
+    // 响应式状态
+    count,
+    name,
+    // 计算属性
+    doubleCount,
+    // 操作方法
+    increment,
+    decrement,
+    setName
+  }
+}, {
+  // 可选配置
+  persist: {
+    key: 'counter-data',        // 本地存储键名
+    paths: ['count', 'name']    // 需要持久化的状态路径
+  }
+})
+```
+
+### 在字段中使用 Store
+
+```ts
+import { defineField, defineReaction } from '@signals-form/core'
+
+const { increment, count } = useCounterStore()
+
+// 字段定义
+const usernameField = defineField({
+  id: "username",
+  component: Input,
+  props: {
+    count: count.value  // 绑定 store 状态
+  },
+  events: {
+    onChange() {
+      increment()  // 触发 store 操作
+      this.setState('count', count.value)  // 同步到字段状态
+    }
+  }
+})
+
+const passwordField = defineField({
+  id: "password",
+  component: Input,
+  props: {
+    count: count.value
+  }
+})
+
+// 使用联动同步 store 状态到字段
+defineReaction((handler) => {
+  const field = handler.query('password')
+  field.setState('count', count.value)
+})
+```
+
+## 状态宏简化
+
+使用状态宏 `$bind` 和 `$model` 可以大大简化 Store 的绑定操作：
+
+```ts
+import { $bind, $model } from "@signals-form/core"
+
+const { increment, count, name } = useCounterStore()
+
+// 简化的字段定义
+defineField({
+  id: "username",
+  component: Input,
+  props: {
+    count: $bind(count)  // 自动绑定响应式状态
+  },
+  events: {
+    onChange() {
+      increment()  // 只需调用 store 方法
+    }
+  }
+})
+
+defineField({
+  id: "password",
+  component: Input,
+  props: {
+    count: $bind(count),    // 自动响应状态变化
+    title: $bind(name)      // 支持多个状态绑定
+  }
+})
+```
+
+## 应用场景
+
+### 1. 跨字段数据共享
+
+```ts title="用户权限管理"
+export const useUserStore = defineStore('user', () => {
+  const permissions = signal<string[]>([])
+  const userRole = signal<'admin' | 'user' | 'guest'>('guest')
+  
+  const canEdit = computed(() => 
+    userRole.value === 'admin' || permissions.value.includes('edit')
+  )
+  
+  function updateRole(role: typeof userRole.value) {
+    userRole.value = role
+  }
+  
+  return { permissions, userRole, canEdit, updateRole }
+})
+
+// 在字段中使用
+const { canEdit, userRole } = useUserStore()
+
+defineField({
+  id: "editButton",
+  component: Button,
+  props: {
+    disabled: $bind(() => !canEdit.value)  // 根据权限控制按钮状态
+  }
+})
+```
+
+### 2. 表单状态管理
+
+```ts title="表单验证状态"
+export const useFormStore = defineStore('form', () => {
+  const isSubmitting = signal(false)
+  const errors = signal<Record<string, string>>({})
+  const touchedFields = signal<Set<string>>(new Set())
+  
+  const hasErrors = computed(() => Object.keys(errors.value).length > 0)
+  const canSubmit = computed(() => !isSubmitting.value && !hasErrors.value)
+  
+  function setError(field: string, message: string) {
+    errors.value = { ...errors.value, [field]: message }
+  }
+  
+  function clearError(field: string) {
+    const newErrors = { ...errors.value }
+    delete newErrors[field]
+    errors.value = newErrors
+  }
+  
+  function touchField(field: string) {
+    touchedFields.value = new Set([...touchedFields.value, field])
+  }
+  
+  return {
+    isSubmitting,
+    errors,
+    touchedFields,
+    hasErrors,
+    canSubmit,
+    setError,
+    clearError,
+    touchField
+  }
+})
+```
+
+### 3. 主题和配置管理
+
+```ts title="全局配置"
+export const useConfigStore = defineStore('config', () => {
+  const theme = signal<'light' | 'dark'>('light')
+  const language = signal<'zh' | 'en'>('zh')
+  const apiBaseUrl = signal('https://api.example.com')
+  
+  function toggleTheme() {
+    theme.value = theme.value === 'light' ? 'dark' : 'light'
+  }
+  
+  function setLanguage(lang: typeof language.value) {
+    language.value = lang
+  }
+  
+  return {
+    theme,
+    language,
+    apiBaseUrl,
+    toggleTheme,
+    setLanguage
+  }
+}, {
+  persist: {
+    key: 'app-config',
+    paths: ['theme', 'language']  // 持久化主题和语言设置
+  }
+})
+```
+
+## Store 方法
+
+以下方法主要用于插件开发，一般开发者很少直接使用：
+
+### `$reset()` - 重置状态
+
+```ts
+const store = useCounterStore()
+
+// 将 store 状态重置为初始值
+store.$reset()
+```
+
+### `$subscribe()` - 订阅状态变化
+
+```ts
+const store = useCounterStore()
+
+// 监听 store 状态变化
+const unsubscribe = store.$subscribe((mutation, state) => {
+  console.log('Store 状态变化:', mutation, state)
+})
+
+// 取消订阅
+unsubscribe()
+```
+
+### `$patch()` - 批量更新状态
+
+```ts
+const store = useCounterStore()
+
+// 批量更新多个状态
+store.$patch({
+  count: 10,
+  name: 'New Counter'
+})
+
+// 或使用函数形式
+store.$patch((state) => {
+  state.count = state.count + 1
+  state.name = `Counter ${state.count}`
+})
+```
+
+### `$dispose()` - 销毁 Store
+
+```ts
+const store = useCounterStore()
+
+// 销毁整个 Store，清理所有状态和订阅
+store.$dispose()
+```
+
+### `$signals` - 获取所有 Signals
+
+```ts
+const store = useCounterStore()
+
+// 获取 store 中所有注册的 signal
+const signals = store.$signals
+console.log('Store 中的 signals:', signals)
+```
+
+## 持久化配置
+
+Store 支持自动持久化到本地存储：
+
+```ts
+defineStore('user', () => {
+  // store 实现...
+}, {
+  persist: {
+    key: 'user-data',           // 存储键名，默认为 store 名称
+    paths: ['profile', 'token'], // 需要持久化的状态路径
+    storage: localStorage,       // 存储方式，默认 localStorage
+    serializer: {              // 自定义序列化
+      serialize: JSON.stringify,
+      deserialize: JSON.parse
+    }
+  }
+})
+```
+## 注意事项
+
+1. **性能考虑**：Store 中的计算属性会自动缓存，但要避免过于复杂的计算逻辑
+2. **数据流向**：推荐单向数据流，通过 Store 方法修改状态，通过 `$bind` 绑定到字段
+3. **持久化**：只持久化必要的状态，避免存储敏感信息
+4. **生命周期**：Store 实例在应用生命周期内保持存活，注意及时清理不需要的订阅
+
+Store 为 Signals Form 提供了强大的状态管理能力，让复杂的表单状态管理变得简单而高效！✨

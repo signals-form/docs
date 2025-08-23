@@ -1,0 +1,14 @@
+{
+  "title": "示例",
+  "description": "Signals Form 的示例",
+  "root": true,
+  "icon": "FileBox",
+  "pages": [
+    "index",
+    "login",
+    "edit",
+    "boolless",
+    "relation",
+    "reaction"
+  ]
+}

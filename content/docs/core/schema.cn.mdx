@@ -1,0 +1,237 @@
+---
+title: 使用Schema
+description: 可以使用jsonschema定义表单
+---
+
+## 简介
+可以使用jsonschema定义表单，支持ts & JsonSchema，支持多种表单场景。
+
+
+```tsx tab="App" title="src/App.tsx"
+import { defineForm } from "@signals-form/core";
+import { FormControl } from "@signals-form/react"
+import { SchemaManager } from "@signals-form/schema";
+import Form from "@/components/Form";
+import { buildContext } from "./context";
+import formSchema from "./form.json";
+
+export default function SchemaDemo() {
+	const { id, defaultValidatorEngine, resolvers, fields, effects } =
+		new SchemaManager(formSchema, buildContext).buildFormSchema();
+	const boolConfig = {
+		isA: () => true,
+	};
+	const form = defineForm({
+		id,
+		defaultValidatorEngine,
+		fields,
+		effects,
+		resolvers,
+		boolConfig,
+	});
+
+	return <Form form={form} style={{ width: "400px" }}>
+		<FormControl form={form} />
+	</Form>;
+}
+
+```
+
+```ts tab="Context" title="src/context.ts"
+import type { FieldHandler } from "@signals-form/core";
+import type { Handler } from "@signals-form/core/src/types/dependency";
+import { zodResolver } from "@signals-form/resolvers";
+import { z } from "zod";
+import Form from "@/components/Form";
+import Input from "@/components/Input";
+
+export const buildContext = {
+	actions: {
+		onDefaultValueForE: () => {
+			return [];
+		},
+		onDefaultValueForB: () => {
+			return "default value for b";
+		},
+		onSubmitValueForB: () => {
+			console.log("submit value for b");
+			return "submit value for b";
+		},
+	},
+
+	validator: {
+		validatorA: z
+			.string({
+				message: "请输入正确的值",
+			})
+			.min(1)
+			.max(10),
+	},
+
+	resolvers: {
+		validator: {
+			zod: zodResolver,
+		},
+		components: {
+			Form,
+			Input,
+		},
+	},
+
+	effects: {
+		reactions: {
+			update1(field: FieldHandler) {
+				field.setState("value", Math.floor(Math.random() * 100));
+			},
+			update2(field: FieldHandler) {
+				setTimeout(() => {
+					field.setState("value", String(Math.floor(Math.random() * 100)));
+				}, 1000);
+			},
+			update3(field: FieldHandler) {
+				const url = "https://mdn.github.io/dom-examples/abort-api/sintel.mp4";
+				async function fetchVideo() {
+					const response = await fetch(url);
+					if (!response.ok) {
+						throw new Error("Network response was not ok");
+					}
+					const blob = await response.blob();
+					const videoUrl = URL.createObjectURL(blob);
+					console.log("videoUrl", videoUrl);
+					return videoUrl;
+				}
+				fetchVideo()
+					.then((videoUrl) => {
+						setTimeout(() => {
+							field.setState("info", videoUrl);
+						}, 500);
+					})
+					.catch((error) => {
+						if (error instanceof DOMException && error.name === "AbortError") {
+							console.log("Fetch aborted:", error.message);
+						} else {
+							console.error("Fetch failed:", error);
+						}
+					});
+			},
+			update4: (field: FieldHandler, [cValue, dValue]: any) => {
+				const aValue = field.query("a")?.value;
+				setTimeout(() => {
+					const d = [`a: ${aValue}, c: ${cValue}, d: ${dValue}`];
+					field.setState("value", d);
+				}, 2000);
+			},
+			update5: (field: FieldHandler, eValue: any) => {
+				const cValue = field.query("c");
+				console.log(cValue);
+				field.setState("info", eValue[0]);
+			},
+			update6: (handler: Handler) => {
+				const { query } = handler;
+				const aValue = query("a")?.value;
+				const bValue = query("c")?.value;
+				console.log("auto reaction", `a: ${aValue}, c: ${bValue}`);
+			},
+		},
+	},
+};
+```
+
+```json tab="Login" title="src/login.json"
+{
+  "$schema": "@signals-form/schema/form-schema.json",
+  "id": "SchemaForm",
+  "defaultValidatorEngine": "zod",
+  "resolvers": {
+    "validators": "{{resolvers.validators}}",
+    "components": "{{resolvers.components}}"
+  },
+  "components": "{{components}}",
+  "fields": [
+    {
+      "id": "a",
+      "component": "Input",
+      "props": {
+        "label": "a",
+        "prefix": "👤",
+        "required": true
+      },
+      "initialValue": 1,
+      "validators": "{{validators.validatorA}}"
+    },
+    {
+      "id": "b",
+      "component": "Input",
+      "props": {
+        "label": "b",
+        "prefix": "🔒",
+        "required": true
+      },
+      "actions": {
+        "onDefaultValue": "{{actions.onDefaultValueForB}}",
+        "onSubmitValue": "{{actions.setSubmitValueForB}}"
+      },
+      "hidden": "D.use('isA')"
+    },
+    {
+      "id": "c",
+      "component": "Input",
+      "props": {
+        "label": "c",
+        "prefix": "🎂",
+        "required": true
+      }
+    },
+    {
+      "id": "d",
+      "component": "Input",
+      "props": {
+        "label": "d",
+        "prefix": "🏠",
+        "required": true
+      }
+    },
+    {
+      "id": "e",
+      "component": "Info",
+      "props": {
+        "label": "e"
+      },
+      "actions": {
+        "onDefaultValue": "{{actions.onDefaultValueForE}}"
+      }
+    }
+  ],
+  "effects": {
+    "reactions": [
+      {
+        "field": "c",
+        "dependencies": ["a"],
+        "update": "{{effects.reactions.update1}}"
+      },
+      {
+        "field": "d",
+        "dependencies": ["a"],
+        "update": "{{effects.reactions.update2}}"
+      },
+      {
+        "field": "a",
+        "dependencies": ["d"],
+        "update": "{{effects.reactions.update3}}"
+      },
+      {
+        "field": "e",
+        "dependencies": ["c", "d"],
+        "update": "{{effects.reactions.update4}}"
+      },
+      {
+        "field": "a",
+        "dependencies": ["e"],
+        "update": "{{effects.reactions.update5}}"
+      },
+      "{{effects.reactions.update6}}"
+    ]
+  }
+}
+
+```

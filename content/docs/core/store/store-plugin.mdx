@@ -1,0 +1,303 @@
+---
+title: Plugin System
+description: Extend Store functionality with plugin architecture
+---
+
+## Overview
+
+The Store plugin system allows you to extend Store functionality through plugins, enabling more powerful and flexible state management.
+
+## Plugin Capabilities
+
+Plugins can provide the following extension capabilities for Store:
+
+- ✅ **Add New Properties** - Add custom properties to store instances
+- ✅ **Extend Configuration Options** - Add new options when `defineStore`
+- ✅ **Add New Methods** - Add custom methods to store
+- ✅ **Wrap Existing Methods** - Enhance or modify existing methods
+- ✅ **Intercept Operations** - Change or even cancel action execution
+- ✅ **Implement Side Effects** - Such as local storage, logging, etc.
+- ✅ **Conditional Application** - Apply plugins only to specific stores
+
+## Basic Usage
+
+### Register Plugin
+
+```ts
+import { defineStore, registerPlugin } from "@signals-form/store"
+import { createPersistPlugin } from "@signals-form/store/plugins"
+
+// Register plugin globally
+registerPlugin(createPersistPlugin({
+  // Basic plugin configuration
+  storage: localStorage,
+  key: 'signals-form-store'
+}))
+```
+
+### Use Plugin Features
+
+```ts
+const useCounterStore = defineStore('counter', () => {
+  const counter = signal(100)
+  const name = signal('cherry')
+  
+  function increment() {
+    counter.value += 1
+  }
+  
+  function decrement() {
+    counter.value -= 1
+  }
+  
+  return {
+    counter,
+    name,
+    increment,
+    decrement
+  }
+}, {
+  persist: true  // Enable persistence plugin functionality
+})
+
+// Use store
+const { increment, counter } = useCounterStore()
+
+increment()  // counter: 101
+increment()  // counter: 102
+increment()  // counter: 103
+
+console.log(counter.value)  // 103, and will be automatically saved to localStorage
+```
+
+## Built-in Plugins
+
+### Persistence Plugin
+
+The most commonly used plugin is the persistence plugin, used to save store state to local storage:
+
+```ts
+import { createPersistPlugin } from "@signals-form/store/plugins"
+
+registerPlugin(createPersistPlugin({
+  storage: localStorage,        // Storage method
+  key: 'app-store',            // Storage key prefix
+  serializer: {                // Serialization configuration
+    serialize: JSON.stringify,
+    deserialize: JSON.parse
+  }
+}))
+
+// Use in store
+const useUserStore = defineStore('user', () => {
+  const profile = signal({ name: '', email: '' })
+  const preferences = signal({ theme: 'light' })
+  
+  return { profile, preferences }
+}, {
+  persist: {
+    key: 'user-data',                    // Custom storage key
+    paths: ['profile'],                  // Only persist specified paths
+    storage: sessionStorage,             // Use sessionStorage
+    beforeRestore: (context) => {       // Hook before restore
+      console.log('Preparing to restore state:', context)
+    },
+    afterRestore: (context) => {        // Hook after restore
+      console.log('State restoration complete:', context)
+    }
+  }
+})
+```
+
+### Development Debug Plugin
+
+Debug plugin for development environment:
+
+```ts
+import { createDevtoolsPlugin } from "@signals-form/store/plugins"
+
+if (process.env.NODE_ENV === 'development') {
+  registerPlugin(createDevtoolsPlugin({
+    logMutations: true,          // Log state changes
+    logActions: true,            // Log action calls
+    logTimestamp: true,          // Add timestamps
+    maxLogEntries: 100          // Maximum log entries
+  }))
+}
+```
+
+## Custom Plugins
+
+### Create Simple Plugin
+
+```ts title="Logger Plugin"
+import type { StorePlugin } from "@signals-form/store"
+
+const loggerPlugin: StorePlugin = ({ store, options }) => {
+  // Add new method to store
+  store.$log = (message: string) => {
+    console.log(`[${store.$id}] ${message}`)
+  }
+  
+  // Wrap existing method
+  const originalPatch = store.$patch
+  store.$patch = (partialStateOrMutator) => {
+    console.log(`[${store.$id}] Starting state update`)
+    const result = originalPatch.call(store, partialStateOrMutator)
+    console.log(`[${store.$id}] State update complete`)
+    return result
+  }
+  
+  // Subscribe to state changes
+  store.$subscribe((mutation, state) => {
+    console.log(`[${store.$id}] State change:`, mutation.type, mutation.payload)
+  })
+}
+
+// Register plugin
+registerPlugin(loggerPlugin)
+```
+
+### Advanced Plugin Example
+
+```ts title="Undo Redo Plugin"
+interface UndoRedoOptions {
+  maxHistorySize?: number
+}
+
+function createUndoRedoPlugin(options: UndoRedoOptions = {}): StorePlugin {
+  const { maxHistorySize = 50 } = options
+  
+  return ({ store, options: storeOptions }) => {
+    // Only apply to stores with undoRedo option enabled
+    if (!storeOptions.undoRedo) return
+    
+    const history: any[] = []
+    const redoStack: any[] = []
+    let currentIndex = -1
+    
+    // Add undo/redo methods
+    store.$undo = () => {
+      if (currentIndex > 0) {
+        redoStack.push(store.$state)
+        currentIndex--
+        store.$patch(history[currentIndex])
+      }
+    }
+    
+    store.$redo = () => {
+      if (redoStack.length > 0) {
+        const state = redoStack.pop()!
+        currentIndex++
+        history[currentIndex] = state
+        store.$patch(state)
+      }
+    }
+    
+    store.$canUndo = () => currentIndex > 0
+    store.$canRedo = () => redoStack.length > 0
+    
+    // Record state history
+    store.$subscribe((mutation, state) => {
+      // Clear redo stack
+      redoStack.length = 0
+      
+      // Add to history
+      history.push(JSON.parse(JSON.stringify(state)))
+      currentIndex++
+      
+      // Limit history size
+      if (history.length > maxHistorySize) {
+        history.shift()
+        currentIndex--
+      }
+    })
+    
+    // Initial state
+    history.push(JSON.parse(JSON.stringify(store.$state)))
+    currentIndex = 0
+  }
+}
+
+// Register plugin
+registerPlugin(createUndoRedoPlugin({ maxHistorySize: 100 }))
+
+// Use plugin
+const useFormStore = defineStore('form', () => {
+  const formData = signal({ name: '', email: '' })
+  return { formData }
+}, {
+  undoRedo: true  // Enable undo/redo functionality
+})
+
+const { $undo, $redo, $canUndo } = useFormStore()
+```
+
+## Plugin API
+
+### Plugin Interface
+
+```ts
+interface StorePlugin {
+  (context: {
+    store: Store           // store instance
+    app?: App             // app instance (if any)
+    options: any          // store options configuration
+  }): void
+}
+```
+
+### Store Extension Methods
+
+Plugins can add the following types of methods to store:
+
+```ts
+// Extend Store interface
+declare module '@signals-form/store' {
+  interface Store {
+    // Custom methods
+    $log?(message: string): void
+    $undo?(): void
+    $redo?(): void
+    $canUndo?(): boolean
+    $canRedo?(): boolean
+  }
+}
+```
+
+## Conditional Plugin Application
+
+### Based on Store ID
+
+```ts
+const conditionalPlugin: StorePlugin = ({ store }) => {
+  // Only apply to stores with specific names
+  if (store.$id.startsWith('form-')) {
+    // Add form-specific functionality
+    store.$validate = () => {
+      // Validation logic
+    }
+  }
+}
+```
+
+### Based on Option Configuration
+
+```ts
+const conditionalPlugin: StorePlugin = ({ store, options }) => {
+  // Only apply to stores with specific options
+  if (options.enablePlugin) {
+    // Apply plugin functionality
+  }
+}
+```
+
+## Notes
+
+1. **Plugin Order**: Plugins execute in registration order, later plugins will override earlier ones with the same method names
+2. **Performance Impact**: Plugins execute when each store is created, avoid heavy operations in plugins
+3. **Type Safety**: Correctly declare types when extending Store interface
+4. **Conditional Application**: Use conditional logic reasonably, avoid unnecessary plugin logic execution
+5. **Resource Cleanup**: Subscriptions and timers created by plugins need to be cleaned up at appropriate times
+
+The plugin system gives Store unlimited extension possibilities, making your state management more powerful and flexible! ✨

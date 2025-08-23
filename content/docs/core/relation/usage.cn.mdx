@@ -1,0 +1,57 @@
+---
+title: 使用方式
+---
+
+## 创建联动关系
+
+```ts title="普通联动"
+import { defineReaction } from '@signals-form/core'
+
+const reaction1 = defineReaction({
+  field: targetField,           // 目标字段
+  dependencies: [sourceField],  // 依赖字段数组
+  update: (handler, values) => {
+    // 更新逻辑
+    handler.setState('value', values[0])
+  }
+})
+```
+
+```ts title="受控联动"
+import { defineRelation } from '@signals-form/core'
+
+const relation1 = defineRelation({
+  field: targetField,           // 目标字段
+  dependencies: [sourceField],  // 依赖字段数组
+  update: (handler, values) => {
+
+    // 更新逻辑
+    return handler.value + values[0]
+  }
+})
+```
+
+## 字段注册
+在 `defineField` 中进行注册联动关系
+
+```ts
+const username = defineField({
+  // ...
+  effects: {
+    reactions: [reaction1],
+    relations: [relation1]
+  }
+})
+
+```
+## 表单注册
+在 `defineForm` 中注册联动关系
+```ts
+const form = defineForm({
+  // ...
+  effects: {
+    reactions: [reaction1],
+    relations: [relation1]
+  }
+})
+````

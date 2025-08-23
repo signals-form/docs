@@ -1,0 +1,38 @@
+---
+title: Void Field
+description: 空字段
+---
+- VoidField 是表单系统中，处理复杂的布局而生的，他没有 Value 属性，他所绑定的桥接组件，可以用来控制数据型字段的显示隐藏
+
+- 使用 `defineVoidField` 定义空字段。
+
+## 示例
+
+```tsx
+const Container = (
+  { children, label, ...props }: { children: ReactNode, label: string }
+) => {
+  return (
+    <div>
+      {label && <div>{label}</div>}
+      <Space {...props}>
+        {children}
+      </Space>
+    </div>
+  );
+};
+
+const contactInfo = defineVoidField({
+  id: "contactInfo",
+  component: Container,
+  props: {
+    label: "联系方式信息",
+    direction: 'vertical'
+  },
+  properties: [
+    email,
+    phone,
+    wechat
+  ]
+});
+```

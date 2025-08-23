@@ -1,0 +1,385 @@
+---
+title: "草稿保存与恢复"
+description: "实现表单数据的草稿保存、自动备份和恢复功能"
+---
+
+## 概述
+
+草稿功能允许用户在填写表单过程中自动保存数据，避免因意外情况导致的数据丢失。通过监听表单更新完成事件，可以在合适的时机保存草稿状态。
+
+## 核心 API
+
+### `onUpdatesComplete` - 监听更新完成
+
+当表单的所有联动和更新操作完成后触发，是保存草稿的最佳时机：
+
+```ts
+// 监听表单更新完成
+const unsubscribe = form.onUpdatesComplete(() => {
+  console.log('所有字段联动和更新已完成')
+  // 执行草稿保存逻辑
+})
+
+// 取消监听
+unsubscribe()
+```
+
+**为什么选择这个时机？**
+- ✅ 确保所有联动关系都已执行完毕
+- ✅ 获得最终稳定的表单状态
+- ✅ 避免在联动过程中保存中间状态
+- ✅ 减少不必要的保存操作
+
+## 基础草稿实现
+
+### 简单草稿保存
+
+```ts title="基础草稿功能"
+class FormDraft {
+  private drafts = new Map<string, any>()
+  
+  constructor(private form: Form) {
+    this.setupDraftSaving()
+  }
+  
+  private setupDraftSaving() {
+    // 监听表单更新完成
+    this.form.onUpdatesComplete(() => {
+      this.saveDraft()
+    })
+  }
+  
+  private saveDraft() {
+    // 保存当前表单状态为草稿
+    const draftData = {
+      model: this.form.model,
+      timestamp: Date.now(),
+      version: '1.0'
+    }
+    
+    this.drafts.set('current', draftData)
+    console.log('草稿已保存:', draftData)
+  }
+  
+  // 恢复草稿
+  restoreDraft() {
+    const draft = this.drafts.get('current')
+    if (draft) {
+      this.form.updateModel(draft.model)
+      console.log('草稿已恢复:', draft)
+    }
+  }
+  
+  // 清除草稿
+  clearDraft() {
+    this.drafts.delete('current')
+    console.log('草稿已清除')
+  }
+}
+
+// 使用草稿功能
+const draftManager = new FormDraft(form)
+
+// 恢复草稿
+draftManager.restoreDraft()
+
+// 清除草稿
+draftManager.clearDraft()
+```
+
+## 高级草稿功能
+
+### 带本地存储的草稿
+
+```ts title="持久化草稿"
+class PersistentDraft {
+  private storageKey: string
+  private autoSaveDelay = 1000 // 1秒防抖
+  private saveTimer: NodeJS.Timeout | null = null
+  
+  constructor(
+    private form: Form, 
+    private formId: string
+  ) {
+    this.storageKey = `form-draft-${formId}`
+    this.setupAutoSave()
+    this.loadDraft()
+  }
+  
+  private setupAutoSave() {
+    this.form.onUpdatesComplete(() => {
+      // 防抖保存，避免频繁写入存储
+      if (this.saveTimer) {
+        clearTimeout(this.saveTimer)
+      }
+      
+      this.saveTimer = setTimeout(() => {
+        this.saveDraft()
+      }, this.autoSaveDelay)
+    })
+  }
+  
+  private saveDraft() {
+    try {
+      const draftData = {
+        model: this.form.model,
+        timestamp: Date.now(),
+        formId: this.formId,
+        version: '1.0'
+      }
+      
+      localStorage.setItem(this.storageKey, JSON.stringify(draftData))
+      console.log('草稿已自动保存到本地存储')
+    } catch (error) {
+      console.error('保存草稿失败:', error)
+    }
+  }
+  
+  private loadDraft() {
+    try {
+      const savedDraft = localStorage.getItem(this.storageKey)
+      if (savedDraft) {
+        const draft = JSON.parse(savedDraft)
+        console.log('发现本地草稿:', draft)
+        return draft
+      }
+    } catch (error) {
+      console.error('加载草稿失败:', error)
+    }
+    return null
+  }
+  
+  // 恢复草稿
+  async restoreDraft(): Promise<boolean> {
+    const draft = this.loadDraft()
+    if (draft) {
+      // 检查草稿是否过期（例如7天）
+      const isExpired = Date.now() - draft.timestamp > 7 * 24 * 60 * 60 * 1000
+      
+      if (isExpired) {
+        console.log('草稿已过期，自动清除')
+        this.clearDraft()
+        return false
+      }
+      
+      // 恢复草稿数据
+      this.form.updateModel(draft.model)
+      console.log('草稿恢复成功')
+      return true
+    }
+    
+    return false
+  }
+  
+  // 清除草稿
+  clearDraft() {
+    localStorage.removeItem(this.storageKey)
+    if (this.saveTimer) {
+      clearTimeout(this.saveTimer)
+      this.saveTimer = null
+    }
+    console.log('草稿已清除')
+  }
+  
+  // 获取草稿信息
+  getDraftInfo() {
+    const draft = this.loadDraft()
+    return draft ? {
+      timestamp: draft.timestamp,
+      age: Date.now() - draft.timestamp,
+      formId: draft.formId
+    } : null
+  }
+}
+
+// 使用持久化草稿
+const draftManager = new PersistentDraft(form, 'user-profile-form')
+
+// 页面加载时尝试恢复草稿
+window.addEventListener('load', async () => {
+  const restored = await draftManager.restoreDraft()
+  if (restored) {
+    // 提示用户草稿已恢复
+    showNotification('已恢复之前的草稿数据')
+  }
+})
+
+// 表单提交成功后清除草稿
+form.onSubmitSuccess(() => {
+  draftManager.clearDraft()
+})
+```
+
+### 多版本草稿管理
+
+```ts title="多版本草稿"
+class VersionedDraft {
+  private maxVersions = 5
+  
+  constructor(private form: Form, private formId: string) {
+    this.setupVersionedSaving()
+  }
+  
+  private setupVersionedSaving() {
+    this.form.onUpdatesComplete(() => {
+      this.saveVersionedDraft()
+    })
+  }
+  
+  private saveVersionedDraft() {
+    const storageKey = `form-drafts-${this.formId}`
+    
+    try {
+      // 获取现有草稿版本
+      const existingDrafts = this.getDraftVersions()
+      
+      // 创建新版本
+      const newDraft = {
+        id: `v${Date.now()}`,
+        model: this.form.model,
+        timestamp: Date.now(),
+        title: this.generateDraftTitle()
+      }
+      
+      // 添加新版本并限制数量
+      existingDrafts.unshift(newDraft)
+      if (existingDrafts.length > this.maxVersions) {
+        existingDrafts.splice(this.maxVersions)
+      }
+      
+      // 保存到本地存储
+      localStorage.setItem(storageKey, JSON.stringify(existingDrafts))
+      console.log('新草稿版本已保存:', newDraft)
+      
+    } catch (error) {
+      console.error('保存草稿版本失败:', error)
+    }
+  }
+  
+  private getDraftVersions(): any[] {
+    const storageKey = `form-drafts-${this.formId}`
+    try {
+      const saved = localStorage.getItem(storageKey)
+      return saved ? JSON.parse(saved) : []
+    } catch {
+      return []
+    }
+  }
+  
+  private generateDraftTitle(): string {
+    const now = new Date()
+    return `草稿 ${now.getMonth() + 1}/${now.getDate()} ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`
+  }
+  
+  // 获取所有草稿版本
+  getAllVersions() {
+    return this.getDraftVersions()
+  }
+  
+  // 恢复指定版本
+  restoreVersion(versionId: string) {
+    const versions = this.getDraftVersions()
+    const version = versions.find(v => v.id === versionId)
+    
+    if (version) {
+      this.form.updateModel(version.model)
+      console.log('已恢复草稿版本:', version)
+      return true
+    }
+    
+    return false
+  }
+  
+  // 删除指定版本
+  deleteVersion(versionId: string) {
+    const storageKey = `form-drafts-${this.formId}`
+    const versions = this.getDraftVersions()
+    const filteredVersions = versions.filter(v => v.id !== versionId)
+    
+    localStorage.setItem(storageKey, JSON.stringify(filteredVersions))
+    console.log('草稿版本已删除:', versionId)
+  }
+}
+```
+
+## 实际应用场景
+
+### 1. 表单草稿提示
+
+```ts title="草稿恢复提示"
+class DraftPrompt {
+  constructor(private draftManager: PersistentDraft) {}
+  
+  async checkAndPromptRestore() {
+    const draftInfo = this.draftManager.getDraftInfo()
+    
+    if (draftInfo) {
+      const ageHours = Math.floor(draftInfo.age / (1000 * 60 * 60))
+      const message = `发现 ${ageHours} 小时前的草稿，是否恢复？`
+      
+      const shouldRestore = await this.showConfirmDialog(message)
+      
+      if (shouldRestore) {
+        return this.draftManager.restoreDraft()
+      } else {
+        this.draftManager.clearDraft()
+        return false
+      }
+    }
+    
+    return false
+  }
+  
+  private showConfirmDialog(message: string): Promise<boolean> {
+    return new Promise(resolve => {
+      // 使用你的 UI 库显示确认对话框
+      const result = confirm(message)
+      resolve(result)
+    })
+  }
+}
+```
+
+### 2. 离开页面提醒
+
+```ts title="页面离开提醒"
+class PageLeaveGuard {
+  private hasUnsavedChanges = false
+  
+  constructor(private form: Form, private draftManager: PersistentDraft) {
+    this.setupLeaveGuard()
+  }
+  
+  private setupLeaveGuard() {
+    // 监听表单变化
+    this.form.onUpdatesComplete(() => {
+      this.hasUnsavedChanges = true
+    })
+    
+    // 表单提交成功后标记为已保存
+    this.form.onSubmitSuccess(() => {
+      this.hasUnsavedChanges = false
+    })
+    
+    // 页面离开前提醒
+    window.addEventListener('beforeunload', (event) => {
+      if (this.hasUnsavedChanges) {
+        const message = '您有未保存的更改，确定要离开吗？'
+        event.preventDefault()
+        event.returnValue = message
+        return message
+      }
+    })
+  }
+}
+```
+
+## 注意事项
+
+1. **时机选择**：使用 `onUpdatesComplete` 确保在所有联动完成后保存草稿
+2. **性能优化**：使用防抖机制避免频繁的存储操作
+3. **数据安全**：不要保存敏感信息（密码、信用卡号等）到本地存储
+4. **存储限制**：注意本地存储的容量限制，定期清理过期草稿
+5. **用户体验**：提供草稿恢复提示和页面离开确认
+
+草稿功能为用户提供了数据安全保障，让表单填写体验更加友好和可靠！✨

@@ -1,0 +1,123 @@
+---
+title: Decision Operators
+description: Logical operators for decision making
+---
+
+- Currently supported operators: `and`, `or`, `not`, `use`
+- Operator parameters can be one or more decision conditions, which can be boolean values, functions, or other operators.
+- The return value of operators is a new decision condition that can be used for further combination or execution.
+
+```ts
+import { D } from "@signals-form/core"
+
+D.and(
+  D.or(
+    'isA',
+    'isB'
+  ),
+  D.use('isC')
+).not()
+```
+
+### `and`
+- The `and` operator is used to combine multiple decision conditions. Only when all conditions are `true`, the entire expression is `true`.
+
+```ts
+import { D } from "@signals-form/core"
+const model = {
+  isA: true,
+  isB: false,
+}
+D.and('isA', 'isB').execute(model) // isA && isB false
+```
+
+### `or`
+- The `or` operator is used to combine multiple decision conditions. As long as one condition is `true`, the entire expression is `true`.
+
+```ts
+import { D } from "@signals-form/core"
+const model = {
+  isA: true,
+  isB: false,
+}
+D.or('isA', 'isB').execute(model) // isA || isB true
+```
+
+### `not`
+- The `not` operator is used to negate a decision condition.
+
+```ts
+import { D } from "@signals-form/core"
+const model = {
+  isA: true,
+  isB: false,
+}
+D.not('isA').execute(model) // !isA false
+D.not('isB').execute(model) // !isB true
+```
+
+### `use`
+- The `use` operator is used to convert a condition into a function.
+
+```ts
+import { D } from "@signals-form/core"
+const model = {
+  isA: true,
+  isB: false,
+}
+D.use('isA').execute(model) // isA true
+D.use('isB').execute(model) // isB false
+```
+
+## Operator Combination
+- `and`, `or`, `not`, `use` operators can be combined to form complex decisions.
+
+```ts
+import { D } from "@signals-form/core"
+const model = {
+  isA: true,
+  isB: false,
+  isC: true,
+}
+D.and(
+  D.or(
+    'isA',
+    'isB'
+  ),
+  D.use('isC')
+).not().execute(model) // !((isA || isB) && isC) // false
+
+D.or('isA', "isB").and('isC').execute(model) // (isA || isB) && isC // true
+```
+
+## Operator Function Support
+- `and`, `or`, `not`, `use` operators support functions as parameters.
+- The return value of the function can be a boolean value, function, or other operator.
+- The function's parameter is a model object, which can be used to get data from the model.
+
+```ts
+import { D } from "@signals-form/core"
+const fns = {
+  isA: () => true,
+  isB: () => false,
+  isC: (data) => {
+    let num = data + 1
+    return (model) => model.c === num
+  },
+}
+
+const model = {
+  c: 2,
+}
+
+D.and(
+  D.or(
+    fns.isA,
+    fns.isB
+  ),
+  D.use(fns.isC(1))
+).execute(model) // true
+```
+
+## Reference
+- [Decision Operators](https://support.microsoft.com/en-us/office/use-and-and-or-to-test-a-combination-of-conditions-e1ed88d7-1de3-4422-ae41-45291a69f9e1)

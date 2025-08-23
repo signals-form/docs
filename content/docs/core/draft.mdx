@@ -1,0 +1,385 @@
+---
+title: "Draft Save and Restore"
+description: "Implement form data draft saving, automatic backup and restore functionality"
+---
+
+## Overview
+
+The draft feature allows users to automatically save data during form filling, preventing data loss due to unexpected situations. By listening to form update completion events, draft status can be saved at appropriate times.
+
+## Core API
+
+### `onUpdatesComplete` - Listen for Update Completion
+
+Triggered when all form linkage and update operations are completed, this is the best time to save drafts:
+
+```ts
+// Listen for form update completion
+const unsubscribe = form.onUpdatesComplete(() => {
+  console.log('All field linkages and updates completed')
+  // Execute draft saving logic
+})
+
+// Cancel listening
+unsubscribe()
+```
+
+**Why choose this timing?**
+- ✅ Ensures all linkage relationships have been executed
+- ✅ Obtains final stable form state
+- ✅ Avoids saving intermediate states during linkage
+- ✅ Reduces unnecessary save operations
+
+## Basic Draft Implementation
+
+### Simple Draft Saving
+
+```ts title="Basic Draft Functionality"
+class FormDraft {
+  private drafts = new Map<string, any>()
+  
+  constructor(private form: Form) {
+    this.setupDraftSaving()
+  }
+  
+  private setupDraftSaving() {
+    // Listen for form update completion
+    this.form.onUpdatesComplete(() => {
+      this.saveDraft()
+    })
+  }
+  
+  private saveDraft() {
+    // Save current form state as draft
+    const draftData = {
+      model: this.form.model,
+      timestamp: Date.now(),
+      version: '1.0'
+    }
+    
+    this.drafts.set('current', draftData)
+    console.log('Draft saved:', draftData)
+  }
+  
+  // Restore draft
+  restoreDraft() {
+    const draft = this.drafts.get('current')
+    if (draft) {
+      this.form.updateModel(draft.model)
+      console.log('Draft restored:', draft)
+    }
+  }
+  
+  // Clear draft
+  clearDraft() {
+    this.drafts.delete('current')
+    console.log('Draft cleared')
+  }
+}
+
+// Use draft functionality
+const draftManager = new FormDraft(form)
+
+// Restore draft
+draftManager.restoreDraft()
+
+// Clear draft
+draftManager.clearDraft()
+```
+
+## Advanced Draft Features
+
+### Draft with Local Storage
+
+```ts title="Persistent Draft"
+class PersistentDraft {
+  private storageKey: string
+  private autoSaveDelay = 1000 // 1 second debounce
+  private saveTimer: NodeJS.Timeout | null = null
+  
+  constructor(
+    private form: Form, 
+    private formId: string
+  ) {
+    this.storageKey = `form-draft-${formId}`
+    this.setupAutoSave()
+    this.loadDraft()
+  }
+  
+  private setupAutoSave() {
+    this.form.onUpdatesComplete(() => {
+      // Debounce save to avoid frequent storage writes
+      if (this.saveTimer) {
+        clearTimeout(this.saveTimer)
+      }
+      
+      this.saveTimer = setTimeout(() => {
+        this.saveDraft()
+      }, this.autoSaveDelay)
+    })
+  }
+  
+  private saveDraft() {
+    try {
+      const draftData = {
+        model: this.form.model,
+        timestamp: Date.now(),
+        formId: this.formId,
+        version: '1.0'
+      }
+      
+      localStorage.setItem(this.storageKey, JSON.stringify(draftData))
+      console.log('Draft automatically saved to local storage')
+    } catch (error) {
+      console.error('Failed to save draft:', error)
+    }
+  }
+  
+  private loadDraft() {
+    try {
+      const savedDraft = localStorage.getItem(this.storageKey)
+      if (savedDraft) {
+        const draft = JSON.parse(savedDraft)
+        console.log('Found local draft:', draft)
+        return draft
+      }
+    } catch (error) {
+      console.error('Failed to load draft:', error)
+    }
+    return null
+  }
+  
+  // Restore draft
+  async restoreDraft(): Promise<boolean> {
+    const draft = this.loadDraft()
+    if (draft) {
+      // Check if draft is expired (e.g., 7 days)
+      const isExpired = Date.now() - draft.timestamp > 7 * 24 * 60 * 60 * 1000
+      
+      if (isExpired) {
+        console.log('Draft expired, automatically clearing')
+        this.clearDraft()
+        return false
+      }
+      
+      // Restore draft data
+      this.form.updateModel(draft.model)
+      console.log('Draft restored successfully')
+      return true
+    }
+    
+    return false
+  }
+  
+  // Clear draft
+  clearDraft() {
+    localStorage.removeItem(this.storageKey)
+    if (this.saveTimer) {
+      clearTimeout(this.saveTimer)
+      this.saveTimer = null
+    }
+    console.log('Draft cleared')
+  }
+  
+  // Get draft information
+  getDraftInfo() {
+    const draft = this.loadDraft()
+    return draft ? {
+      timestamp: draft.timestamp,
+      age: Date.now() - draft.timestamp,
+      formId: draft.formId
+    } : null
+  }
+}
+
+// Use persistent draft
+const draftManager = new PersistentDraft(form, 'user-profile-form')
+
+// Try to restore draft when page loads
+window.addEventListener('load', async () => {
+  const restored = await draftManager.restoreDraft()
+  if (restored) {
+    // Notify user that draft has been restored
+    showNotification('Previous draft data has been restored')
+  }
+})
+
+// Clear draft after successful form submission
+form.onSubmitSuccess(() => {
+  draftManager.clearDraft()
+})
+```
+
+### Multi-version Draft Management
+
+```ts title="Multi-version Draft"
+class VersionedDraft {
+  private maxVersions = 5
+  
+  constructor(private form: Form, private formId: string) {
+    this.setupVersionedSaving()
+  }
+  
+  private setupVersionedSaving() {
+    this.form.onUpdatesComplete(() => {
+      this.saveVersionedDraft()
+    })
+  }
+  
+  private saveVersionedDraft() {
+    const storageKey = `form-drafts-${this.formId}`
+    
+    try {
+      // Get existing draft versions
+      const existingDrafts = this.getDraftVersions()
+      
+      // Create new version
+      const newDraft = {
+        id: `v${Date.now()}`,
+        model: this.form.model,
+        timestamp: Date.now(),
+        title: this.generateDraftTitle()
+      }
+      
+      // Add new version and limit quantity
+      existingDrafts.unshift(newDraft)
+      if (existingDrafts.length > this.maxVersions) {
+        existingDrafts.splice(this.maxVersions)
+      }
+      
+      // Save to local storage
+      localStorage.setItem(storageKey, JSON.stringify(existingDrafts))
+      console.log('New draft version saved:', newDraft)
+      
+    } catch (error) {
+      console.error('Failed to save draft version:', error)
+    }
+  }
+  
+  private getDraftVersions(): any[] {
+    const storageKey = `form-drafts-${this.formId}`
+    try {
+      const saved = localStorage.getItem(storageKey)
+      return saved ? JSON.parse(saved) : []
+    } catch {
+      return []
+    }
+  }
+  
+  private generateDraftTitle(): string {
+    const now = new Date()
+    return `Draft ${now.getMonth() + 1}/${now.getDate()} ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`
+  }
+  
+  // Get all draft versions
+  getAllVersions() {
+    return this.getDraftVersions()
+  }
+  
+  // Restore specified version
+  restoreVersion(versionId: string) {
+    const versions = this.getDraftVersions()
+    const version = versions.find(v => v.id === versionId)
+    
+    if (version) {
+      this.form.updateModel(version.model)
+      console.log('Draft version restored:', version)
+      return true
+    }
+    
+    return false
+  }
+  
+  // Delete specified version
+  deleteVersion(versionId: string) {
+    const storageKey = `form-drafts-${this.formId}`
+    const versions = this.getDraftVersions()
+    const filteredVersions = versions.filter(v => v.id !== versionId)
+    
+    localStorage.setItem(storageKey, JSON.stringify(filteredVersions))
+    console.log('Draft version deleted:', versionId)
+  }
+}
+```
+
+## Practical Application Scenarios
+
+### 1. Form Draft Prompt
+
+```ts title="Draft Restore Prompt"
+class DraftPrompt {
+  constructor(private draftManager: PersistentDraft) {}
+  
+  async checkAndPromptRestore() {
+    const draftInfo = this.draftManager.getDraftInfo()
+    
+    if (draftInfo) {
+      const ageHours = Math.floor(draftInfo.age / (1000 * 60 * 60))
+      const message = `Found draft from ${ageHours} hours ago, restore it?`
+      
+      const shouldRestore = await this.showConfirmDialog(message)
+      
+      if (shouldRestore) {
+        return this.draftManager.restoreDraft()
+      } else {
+        this.draftManager.clearDraft()
+        return false
+      }
+    }
+    
+    return false
+  }
+  
+  private showConfirmDialog(message: string): Promise<boolean> {
+    return new Promise(resolve => {
+      // Use your UI library to show confirmation dialog
+      const result = confirm(message)
+      resolve(result)
+    })
+  }
+}
+```
+
+### 2. Page Leave Reminder
+
+```ts title="Page Leave Reminder"
+class PageLeaveGuard {
+  private hasUnsavedChanges = false
+  
+  constructor(private form: Form, private draftManager: PersistentDraft) {
+    this.setupLeaveGuard()
+  }
+  
+  private setupLeaveGuard() {
+    // Listen for form changes
+    this.form.onUpdatesComplete(() => {
+      this.hasUnsavedChanges = true
+    })
+    
+    // Mark as saved after successful form submission
+    this.form.onSubmitSuccess(() => {
+      this.hasUnsavedChanges = false
+    })
+    
+    // Remind before leaving page
+    window.addEventListener('beforeunload', (event) => {
+      if (this.hasUnsavedChanges) {
+        const message = 'You have unsaved changes, are you sure you want to leave?'
+        event.preventDefault()
+        event.returnValue = message
+        return message
+      }
+    })
+  }
+}
+```
+
+## Notes
+
+1. **Timing Selection**: Use `onUpdatesComplete` to ensure drafts are saved after all linkages are completed
+2. **Performance Optimization**: Use debounce mechanism to avoid frequent storage operations
+3. **Data Security**: Do not save sensitive information (passwords, credit card numbers, etc.) to local storage
+4. **Storage Limits**: Pay attention to local storage capacity limits, regularly clean expired drafts
+5. **User Experience**: Provide draft restore prompts and page leave confirmations
+
+The draft feature provides users with data security protection, making the form filling experience more friendly and reliable! ✨

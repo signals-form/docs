@@ -1,0 +1,300 @@
+---
+title: 快速开始
+description: 构建您的第一个响应式表单
+---
+
+## 欢迎了解 Signals Form
+
+Signals Form 采用声明式 API 与强大的字段联动无缝集成，为开发者提供灵活的验证机制、卓越的性能表现以及对各种前端框架的全面支持。
+
+<Cards>
+
+<Card icon={<CpuIcon className="text-purple-300" />} title='Form Core'>
+
+表单的核心引擎，提供状态管理、验证和联动能力，是整个表单系统的基础。
+
+</Card>
+
+<Card icon={<PanelsTopLeft className="text-blue-300" />} title='Form Devtools'>
+
+强大的开发调试工具，帮助开发者实时监控表单状态变化，快速定位和解决问题。
+
+</Card>
+
+<Card icon={<Database />} title='Form Graph'>
+
+直观的图形化工具，将表单结构和关系可视化，使复杂表单设计变得简单。
+
+</Card>
+
+<Card icon={<Terminal />} title='Form Relation'>
+
+专业的关系处理系统，轻松处理字段间的复杂依赖和联动关系。
+
+</Card>
+
+</Cards>
+
+<Callout title="想探索更多功能？">
+  查看我们详细的 [核心概念文档](/docs/core) 了解更多高级特性。
+</Callout>
+
+## 核心特性
+
+- ✨ **响应式状态管理**：基于 Signals 的高效状态管理，自动追踪依赖关系
+- 🛡️ **强大的表单验证**：灵活的校验器，支持 Zod、Yup 等主流验证库
+- 🔄 **智能字段联动**：轻松定义字段间的依赖关系，实现复杂的表单联动逻辑
+- 🧩 **组件化设计**：与 React、Vue、Svelte 等框架无缝集成
+- 🚀 **极致性能**：精确更新策略，避免不必要的重渲染
+- 🔗 **强大的字段关联**：支持复杂的字段间关系和数据流
+
+## 快速开始
+
+### 安装
+
+选择适合您项目的包管理器来安装 Signals Form：
+
+<Tabs groupId='package-manager' persist items={['npm', 'pnpm', 'yarn', 'bun']}>
+
+```bash tab="npm"
+npm install @signals-form/core @signals-form/react
+```
+
+```bash tab="pnpm"
+pnpm install @signals-form/core @signals-form/react
+```
+
+```bash tab="yarn"
+yarn add @signals-form/core @signals-form/react
+```
+
+```bash tab="bun"
+bun install @signals-form/core @signals-form/react
+```
+
+</Tabs>
+
+### 步骤 1：定义字段
+
+创建一个具有验证功能的用户名字段：
+
+```ts title="src/fields/username.ts"
+import { defineField } from "@signals-form/core"
+import { z } from "zod"
+import { Input } from "./components/Input"
+
+export const username = defineField({
+  id: "username",
+  component: Input,
+  props: {
+    label: "用户名",
+    placeholder: "请输入用户名"
+  },
+  validators: z.string().min(3, "用户名至少3个字符").max(20, "用户名不能超过20个字符")
+})
+```
+
+### 步骤 2：创建输入组件
+
+实现一个 Input 组件，与表单系统进行链接：
+
+```tsx title="src/components/Input.tsx"
+import type { Messages } from "@signals-form/core"
+
+interface InputProps {
+  label: string
+  placeholder: string
+  value: string
+  messages: Messages
+  onChange: (value: string) => void
+}
+
+export function Input({ label, placeholder, value, messages, onChange }: InputProps) {
+  const errorMessages = messages.error
+    ?.map(item => Object.values(item).map(err => err.message).join(", "))
+    .join(", ")
+
+  return (
+    <div>
+      <label>{label}</label>
+      <input
+        type="text"
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      {errorMessages && (
+        <span className="error-message">{errorMessages}</span>
+      )}
+    </div>
+  )
+}
+```
+
+### 步骤 3：组装表单
+
+通过 `defineForm` 将字段组合，构建完整的表单：
+
+```tsx title="src/components/LoginForm.tsx"
+import { useCallback } from "react"
+import { defineForm } from "@signals-form/core"
+import { FormControl } from "@signals-form/react"
+import { zodResolver } from "@signals-form/resolvers"
+import { username } from "../fields/username"
+
+// 定义表单
+const loginForm = defineForm({
+  id: "LoginForm",
+  defaultValidatorEngine: "zod",
+  fields: [username],
+  resolvers: {
+    validator: {
+      zod: zodResolver,
+    },
+  },
+})
+
+export function LoginForm() {
+  const handleSubmit = useCallback(async () => {
+    const { messages, model } = await loginForm.submit()
+    
+    if (!messages) {
+      console.log("验证通过，表单数据:", model)
+      // 处理登录逻辑
+    } else {
+      console.log("表单验证失败:", messages)
+    }
+  }, [])
+
+  return (
+    <div className="login-form">
+      <h2>用户登录</h2>
+      <FormControl form={loginForm} />
+      <button 
+        onClick={handleSubmit}
+        className="submit-button"
+      >
+        登录
+      </button>
+    </div>
+  )
+}
+```
+
+### 步骤 4：在应用中使用
+
+```tsx title="src/App.tsx"
+import { LoginForm } from "./components/LoginForm"
+
+export function App() {
+  return (
+    <div className="app">
+      <LoginForm />
+    </div>
+  )
+}
+```
+
+## 添加更多字段
+
+让我们扩展表单，添加密码字段和字段联动：
+
+```ts title="src/fields/password.ts"
+import { defineField, defineReaction } from "@signals-form/core"
+import { z } from "zod"
+import { Input } from "../components/Input"
+
+export const password = defineField({
+  id: "password",
+  component: Input,
+  props: {
+    label: "密码",
+    placeholder: "请输入密码",
+    type: "password"
+  },
+  validators: z.string().min(6, "密码至少6个字符")
+})
+
+export const confirmPassword = defineField({
+  id: "confirmPassword", 
+  component: Input,
+  props: {
+    label: "确认密码",
+    placeholder: "请再次输入密码",
+    type: "password"
+  },
+  validators: [
+    defineValidator()
+      .schema(z.string().min(6, "密码至少6个字符!")),
+
+    defineValidator()
+      .passive()
+      .custom(({ query })=>{
+        const password = query('password')
+        const confirmPassword = query('confirmPassword')
+        if (password.isDirty && confirmPassword.isTouched && password.value !== confirmPassword.value) {
+          return { message: "请确认密码!", type: "error" }
+        }
+    })
+  ]
+})
+```
+
+更新表单定义：
+
+```ts title="src/components/LoginForm.tsx"
+import { username } from "../fields/username"
+import { password, confirmPassword, passwordMatchReaction } from "../fields/password"
+
+const loginForm = defineForm({
+  id: "LoginForm",
+  defaultValidatorEngine: "zod",
+  fields: [username, password, confirmPassword],
+  effects: {
+    reactions: [passwordMatchReaction], // 添加字段联动
+  },
+  resolvers: {
+    validator: {
+      zod: zodResolver,
+    },
+  },
+})
+```
+
+## 下一步
+
+恭喜！您已成功创建了第一个 Signals Form 表单。现在您可以：
+
+<Cards>
+  <Card
+    href="/docs/core/field/defineField"
+    title="深入了解字段"
+    description="学习字段定义、属性配置和生命周期管理"
+  />
+  <Card
+    href="/docs/core/validation"
+    title="掌握表单验证"
+    description="了解如何实现复杂的表单验证逻辑和自定义校验器"
+  />
+  <Card
+    href="/docs/core/relation"
+    title="字段联动控制"
+    description="掌握字段间的依赖关系和联动逻辑实现"
+  />
+  <Card
+    href="/docs/examples"
+    title="查看示例"
+    description="浏览更多实际项目中的表单使用案例"
+  />
+</Cards>
+
+## 获得帮助
+
+遇到问题？我们随时为您提供帮助：
+
+- 📖 [完整文档](/docs/core) - 查看详细的 API 文档和使用指南
+- 💬 [GitHub Discussions](https://github.com/signals-form/signals-form/discussions) - 与社区交流讨论
+- 🐛 [GitHub Issues](https://github.com/signals-form/signals-form/issues) - 报告 Bug 或提出功能建议
+- 🚀 [示例代码](https://github.com/signals-form/signals-form/tree/main/examples) - 查看更多实际示例
+
+让我们一起构建更好的表单体验！✨

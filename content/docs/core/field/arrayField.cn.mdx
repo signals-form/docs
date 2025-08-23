@@ -1,0 +1,151 @@
+---
+title: Array Field
+description: 数组字段
+---
+数组字段常用于处理一组相同类型的数据，常用于处理列表、表格等复杂数据结构。例如用户的兴趣爱好、技能标签等。在表单中，数组字段允许用户动态添加、删除、排序一组相同结构的表单项，以便更灵活地收集信息。
+- 使用 `defineArrayField` 定义数组字段。
+- 子字段必须为 非 `void` 字段
+
+## 核心能力
+
+1. 动态增删项目：支持在运行时添加或删除数组中的元素
+2. 排序能力：允许对数组元素进行拖拽排序
+3. 批量操作：支持批量添加、删除或修改多个项目
+4. 嵌套结构：可以嵌套其他字段，包括其他 ArrayField
+5. 独立验证：每个数组项都可以有独立的验证规则
+
+## itemType
+
+- `itemType` 用于指定数组中元素的类型，默认为 `object`，其类型有 `object`、`array`、`primitive`。
+
+- `object`：表示数组元素为对象类型，通常用于复杂数据结构。
+```ts
+defineArrayField({
+  // ...
+  itemType: "object",
+  properties: [
+    name,
+    age
+  ]
+})
+ 
+// value: [ { name: "cherry" , age: 18 } ]
+```
+- `array`：表示数组元素为数组类型，适用于嵌套数组的场景。
+```ts
+defineArrayField({
+  // ...
+  itemType: "array",
+  properties: [
+    name,
+    age
+  ]
+})
+
+// value: [ [ "cherry" , 18 ] ]
+```
+- `primitive`：表示数组元素为原始类型，适用于简单数据类型，如字符串、数字等。
+- 注意，仅支持一个子字段，不可多字段
+
+```ts
+defineArrayField({
+  // ...
+  itemType: "primitive",
+  properties: [
+    name
+  ]
+})
+
+// value: [ "cherry" ]
+```
+
+## 动态联系人列表
+
+```ts
+import { defineArrayField, defineField } from "@signals-form/core"
+
+const name = defineField({
+  id: "name",
+  component: Input,
+  props: {
+    label: "姓名",
+    placeholder: "请输入好友姓名",
+  },
+});
+
+const age = defineField({
+  id: "age",
+  component: InputNumber,
+  props: {
+    label: "年龄",
+    type: "number",
+    placeholder: "请输入好友年龄"
+  },
+});
+
+const friendsField = defineArrayField({
+  id: "friends",
+  component: ArrayField,
+  props: {
+    label: "好友列表"
+  },
+  initialValue: [
+    { name: "Tom", age: 20 },
+    { name: "Jerry", age: 18 }
+  ],
+  properties: [
+    name,
+    age
+  ],
+});
+```
+- 在组件中，会注入 handlers api，可进行各种对数组的操作，如，push，pop，shift，move 等等
+- 渲染数组节点时，数组中的一个元素就是一个 Node
+
+```tsx
+import React from 'react';
+import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons';
+import { Button, Form, Space } from 'antd';
+
+interface Props {
+  label?: string;
+  value?: any[];
+  handlers: any,
+  fields: any[],
+  children?: React.ReactNode[][];
+}
+export const ArrayField: React.FC<Props> = ({
+  children,
+  value,
+  handlers,
+  messages,
+  label
+}: Props) => {
+  return <div>
+    {label && <div style={{marginBottom: '8px'}}>{label}:</div>}
+    <Form.List name={'names'} initialValue={value}>
+      {() => {
+        return <>
+          {
+            children?.map((node, index) => {
+              return <div key={index}>
+                <Space style={{ display: 'flex', marginBottom: 8 }} align="baseline">
+                  {
+                    node
+                  }
+                  <MinusCircleOutlined onClick={() => handlers.remove(index)} />
+                </Space>
+              </div>
+            }) ?? null
+          }
+          <Form.Item>
+            <Button type="dashed" onClick={() => handlers.push({})} block icon={<PlusOutlined />}>
+              Add field
+            </Button>
+          </Form.Item>
+        </>
+      }}
+    </Form.List>
+  </div>
+}
+```

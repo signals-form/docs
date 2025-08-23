@@ -1,0 +1,25 @@
+---
+title: Validators
+description: Form field validation
+---
+
+## props
+`props` is an object used to define field properties. Its value is an object containing the field's attributes.
+
+```ts
+const username = defineField()
+  .props({
+  label: "Username",
+  placeholder: "Please enter username"
+  })
+```
+
+`props` is an object that defines the properties of a field. Its value is an object containing the field's attributes.
+
+```ts
+const username = defineField()
+  .props({
+  label: "Username",
+  placeholder: "Please enter your username"
+  })
+```

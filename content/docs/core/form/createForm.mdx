@@ -1,0 +1,90 @@
+---
+title: Create Form
+description: Create a form
+---
+
+SignalsForm supports multiple frameworks, whether it's `react`, `vue`, or other frameworks, all are supported, and learning one set of APIs can support multiple frameworks.
+
+- `defineForm` can combine various elements such as fields, components, validators, linkage relationships, etc., into a complete form system.
+
+`defineForm` receives a configuration object with the following main properties:
+
+- id: Unique form id.
+- defaultValidatorEngine: The default engine for the form, its value is the validation engine registered in `resolvers`.
+- fields: The collection of fields that the form has, which is an array type.
+
+## boolConfig
+- Inject centralized boolean value configuration into the form, used in conjunction with decisions.
+- It is an object where the key is the parameter of the decision, and the Value is the actual behavior that the decision should execute. This behavior can be a direct bool, a function, or a computed property. This behavior has the ability to access the form model.
+
+```ts
+const boolConfig = {
+    isTom: (model) => model.username === 'Tom',
+    is18: (model) => model.age >= 18,
+}
+
+defineField({
+    ...
+    hidden: D.not('is18') // When the user's age is less than 18, this field needs to be hidden
+})
+
+defineForm({
+    ...
+    boolConfig
+})
+```
+
+## resolvers
+- Collection of resolvers required by the form, used to enhance form capabilities
+
+### validator
+- Validator registration
+```ts
+resolvers:{ 
+    validator: {
+      zod: ZodResolver,
+    }
+  }
+```
+
+### components
+- Component registry
+- When the `component` property in a field is a string, it indicates using a registered component.
+```ts
+const username = defineField<string, Props>({
+  id: "username",
+  component: "Input",
+})
+
+const form = defineForm({
+  id: "Login",
+  defaultValidatorEngine: "zod",
+  fields: [
+    username,
+  ],
+  resolvers:{ 
+    validator: {
+      zod: ZodResolver,
+    },
+    components:{
+      Input: InputComponent,
+    }
+  }
+})
+```
+
+- basicFieldConfig: This property can set default configurations for fields. Currently, it only supports setting activityOnHidden, recoverValueOnShown, removeValueOnHidden, events.
+  - events can uniformly add events to fields. If a field already contains this event, the field's own registered event takes precedence.
+
+## activity
+- activity is a function that must return the virtual DOM of the corresponding framework. When used with the activityOnHidden property in fields set to true, this component can be the parent component of field components to perform some keep-alive actions, but there is also some mental overhead because additional DOM will be added when rendering fields, so it's disabled by default and requires developers to explicitly need it.<br/>
+Example:
+```tsx
+{
+  activity: ({ hidden, children }) => {
+    return <div hidden={hidden}>
+      {children}
+    </div>
+  }
+}
+```

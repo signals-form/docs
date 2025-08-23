@@ -1,0 +1,118 @@
+---
+title: 决策操作符
+---
+
+- 目前支持的操作符有 `and`、`or`、`not`、`use`
+- 操作符的参数可以是一个或多个决策条件，可以是布尔值、函数或其他操作符。
+- 操作符的返回值是一个新的决策条件，可以用于进一步的组合或执行。
+
+```ts
+import { D } from "@signals-from/core"
+
+D.and(
+  D.or(
+    'isA',
+    'isB'
+  ),
+  D.use('isC')
+).not()
+```
+### `and`
+- 操作符用于将多个决策条件组合在一起，只有当所有条件都为 `true` 时，整个表达式才为 `true`。
+
+```ts
+import { D } from "@signals-from/core"
+const model = {
+  isA: true,
+  isB: false,
+}
+D.and('isA', 'isB').execute(model) // isA && isB false
+```
+
+### `or`
+- 操作符用于将多个决策条件组合在一起，只要有一个条件为 `true`，整个表达式就为 `true`。
+
+```ts
+import { D } from "@signals-from/core"
+const model = {
+  isA: true,
+  isB: false,
+}
+D.or('isA', 'isB').execute(model) // isA || isB true
+```
+### `not`
+- `not` 操作符用于对一个决策条件进行取反操作。
+
+```ts
+import { D } from "@signals-from/core"
+const model = {
+  isA: true,
+  isB: false,
+}
+D.not('isA').execute(model) // !isA false
+D.not('isB').execute(model) // !isB true
+```
+
+### `use`
+- 操作符用于将一个条件转换为一个函数。
+```ts
+import { D } from "@signals-from/core"
+const model = {
+  isA: true,
+  isB: false,
+}
+D.use('isA').execute(model) // isA true
+D.use('isB').execute(model) // isB false
+```
+
+## 操作符组合
+- `and`、`or`、`not`、`use` 操作符可以组合使用，形成复杂的决策。
+
+```ts
+import { D } from "@signals-from/core"
+const model = {
+  isA: true,
+  isB: false,
+  isC: true,
+}
+D.and(
+  D.or(
+    'isA',
+    'isB'
+  ),
+  D.use('isC')
+).not().execute(model) // !((isA || isB) && isC) // false
+
+D.or('isA', "isB").and('isC').execute(model) // (isA || isB) && isC // true
+```
+
+## 操作符参数是函数
+- `and`、`or`、`not`、`use` 操作符支持函数作为参数。
+- 函数的返回值可以是布尔值、函数或其他操作符。
+- 函数的参数是一个模型对象，可以用于获取模型中的数据。
+```ts
+import { D } from "@signals-from/core"
+const fns = {
+  isA: () => true,
+  isB: () => false,
+  isC: (data) => {
+    let num = data + 1
+    return (model) => model.c === num
+  },
+}
+
+const model = {
+  c: 2,
+}
+
+D.and(
+  D.or(
+    fns.isA,
+    fns.isB
+  ),
+  D.use(fns.isC(1))
+).execute(model) // true
+```
+
+## 参考
+- [决策操作符](https://support.microsoft.com/en-us/office/use-and-and-or-to-test-a-combination-of-conditions-e1ed88d7-1de3-4422-ae41-45291a69f9e1)

@@ -1,0 +1,58 @@
+---
+title: Usage
+description: How to use relations and reactions
+---
+
+## Creating Linkage Relationships
+
+```ts title="Regular Reaction"
+import { defineReaction } from '@signals-form/core'
+
+const reaction1 = defineReaction({
+  field: targetField,           // Target field
+  dependencies: [sourceField],  // Dependency field array
+  update: (handler, values) => {
+    // Update logic
+    handler.setState('value', values[0])
+  }
+})
+```
+
+```ts title="Controlled Relation"
+import { defineRelation } from '@signals-form/core'
+
+const relation1 = defineRelation({
+  field: targetField,           // Target field
+  dependencies: [sourceField],  // Dependency field array
+  update: (handler, values) => {
+
+    // Update logic
+    return handler.value + values[0]
+  }
+})
+```
+
+## Field Registration
+Register linkage relationships in `defineField`
+
+```ts
+const username = defineField({
+  // ...
+  effects: {
+    reactions: [reaction1],
+    relations: [relation1]
+  }
+})
+
+```
+## Form Registration
+Register linkage relationships in `defineForm`
+```ts
+const form = defineForm({
+  // ...
+  effects: {
+    reactions: [reaction1],
+    relations: [relation1]
+  }
+})
+```

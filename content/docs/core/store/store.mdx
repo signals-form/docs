@@ -1,0 +1,321 @@
+---
+title: State Management
+description: Pinia-like state management library for cross-field state sharing
+---
+
+## Overview
+
+Store is a Pinia-like state management library designed specifically for Signals Form, allowing you to easily share state between fields.
+
+## Basic Usage
+
+### Define Store
+
+```ts
+import { defineStore } from '@signals-form/store'
+import { signal, computed } from "alien-deepsignals"
+
+export const useCounterStore = defineStore('counter', () => {
+  // State definition
+  const count = signal(0)
+  const name = signal('Counter')
+  
+  // Computed properties
+  const doubleCount = computed(() => count.value * 2)
+  
+  // Action methods
+  function increment() {
+    count.value++
+  }
+  
+  function decrement() {
+    count.value--
+  }
+  
+  function setName(newName: string) {
+    name.value = newName
+  }
+  
+  return {
+    // Reactive state
+    count,
+    name,
+    // Computed properties
+    doubleCount,
+    // Action methods
+    increment,
+    decrement,
+    setName
+  }
+}, {
+  // Optional configuration
+  persist: {
+    key: 'counter-data',        // Local storage key
+    paths: ['count', 'name']    // State paths to persist
+  }
+})
+```
+
+### Use Store in Fields
+
+```ts
+import { defineField, defineReaction } from '@signals-form/core'
+
+const { increment, count } = useCounterStore()
+
+// Field definition
+const usernameField = defineField({
+  id: "username",
+  component: Input,
+  props: {
+    count: count.value  // Bind store state
+  },
+  events: {
+    onChange() {
+      increment()  // Trigger store action
+      this.setState('count', count.value)  // Sync to field state
+    }
+  }
+})
+
+const passwordField = defineField({
+  id: "password",
+  component: Input,
+  props: {
+    count: count.value
+  }
+})
+
+// Use reaction to sync store state to field
+defineReaction((handler) => {
+  const field = handler.query('password')
+  field.setState('count', count.value)
+})
+```
+
+## State Macro Simplification
+
+Using state macros `$bind` and `$model` can greatly simplify Store binding operations:
+
+```ts
+import { $bind, $model } from "@signals-form/core"
+
+const { increment, count, name } = useCounterStore()
+
+// Simplified field definition
+defineField({
+  id: "username",
+  component: Input,
+  props: {
+    count: $bind(count)  // Automatically bind reactive state
+  },
+  events: {
+    onChange() {
+      increment()  // Just call store method
+    }
+  }
+})
+
+defineField({
+  id: "password",
+  component: Input,
+  props: {
+    count: $bind(count),    // Automatically respond to state changes
+    title: $bind(name)      // Support multiple state bindings
+  }
+})
+```
+
+## Application Scenarios
+
+### 1. Cross-field Data Sharing
+
+```ts title="User Permission Management"
+export const useUserStore = defineStore('user', () => {
+  const permissions = signal<string[]>([])
+  const userRole = signal<'admin' | 'user' | 'guest'>('guest')
+  
+  const canEdit = computed(() => 
+    userRole.value === 'admin' || permissions.value.includes('edit')
+  )
+  
+  function updateRole(role: typeof userRole.value) {
+    userRole.value = role
+  }
+  
+  return { permissions, userRole, canEdit, updateRole }
+})
+
+// Use in fields
+const { canEdit, userRole } = useUserStore()
+
+defineField({
+  id: "editButton",
+  component: Button,
+  props: {
+    disabled: $bind(() => !canEdit.value)  // Control button state based on permissions
+  }
+})
+```
+
+### 2. Form State Management
+
+```ts title="Form Validation State"
+export const useFormStore = defineStore('form', () => {
+  const isSubmitting = signal(false)
+  const errors = signal<Record<string, string>>({})
+  const touchedFields = signal<Set<string>>(new Set())
+  
+  const hasErrors = computed(() => Object.keys(errors.value).length > 0)
+  const canSubmit = computed(() => !isSubmitting.value && !hasErrors.value)
+  
+  function setError(field: string, message: string) {
+    errors.value = { ...errors.value, [field]: message }
+  }
+  
+  function clearError(field: string) {
+    const newErrors = { ...errors.value }
+    delete newErrors[field]
+    errors.value = newErrors
+  }
+  
+  function touchField(field: string) {
+    touchedFields.value = new Set([...touchedFields.value, field])
+  }
+  
+  return {
+    isSubmitting,
+    errors,
+    touchedFields,
+    hasErrors,
+    canSubmit,
+    setError,
+    clearError,
+    touchField
+  }
+})
+```
+
+### 3. Theme and Configuration Management
+
+```ts title="Global Configuration"
+export const useConfigStore = defineStore('config', () => {
+  const theme = signal<'light' | 'dark'>('light')
+  const language = signal<'zh' | 'en'>('zh')
+  const apiBaseUrl = signal('https://api.example.com')
+  
+  function toggleTheme() {
+    theme.value = theme.value === 'light' ? 'dark' : 'light'
+  }
+  
+  function setLanguage(lang: typeof language.value) {
+    language.value = lang
+  }
+  
+  return {
+    theme,
+    language,
+    apiBaseUrl,
+    toggleTheme,
+    setLanguage
+  }
+}, {
+  persist: {
+    key: 'app-config',
+    paths: ['theme', 'language']  // Persist theme and language settings
+  }
+})
+```
+
+## Store Methods
+
+The following methods are mainly used for plugin development, and general developers rarely use them directly:
+
+### `$reset()` - Reset State
+
+```ts
+const store = useCounterStore()
+
+// Reset store state to initial values
+store.$reset()
+```
+
+### `$subscribe()` - Subscribe to State Changes
+
+```ts
+const store = useCounterStore()
+
+// Listen to store state changes
+const unsubscribe = store.$subscribe((mutation, state) => {
+  console.log('Store state change:', mutation, state)
+})
+
+// Unsubscribe
+unsubscribe()
+```
+
+### `$patch()` - Batch Update State
+
+```ts
+const store = useCounterStore()
+
+// Batch update multiple states
+store.$patch({
+  count: 10,
+  name: 'New Counter'
+})
+
+// Or use function form
+store.$patch((state) => {
+  state.count = state.count + 1
+  state.name = `Counter ${state.count}`
+})
+```
+
+### `$dispose()` - Destroy Store
+
+```ts
+const store = useCounterStore()
+
+// Destroy entire Store, clean up all states and subscriptions
+store.$dispose()
+```
+
+### `$signals` - Get All Signals
+
+```ts
+const store = useCounterStore()
+
+// Get all registered signals in store
+const signals = store.$signals
+console.log('Signals in store:', signals)
+```
+
+## Persistence Configuration
+
+Store supports automatic persistence to local storage:
+
+```ts
+defineStore('user', () => {
+  // store implementation...
+}, {
+  persist: {
+    key: 'user-data',           // Storage key, defaults to store name
+    paths: ['profile', 'token'], // State paths to persist
+    storage: localStorage,       // Storage method, defaults to localStorage
+    serializer: {              // Custom serialization
+      serialize: JSON.stringify,
+      deserialize: JSON.parse
+    }
+  }
+})
+```
+
+## Notes
+
+1. **Performance Considerations**: Computed properties in Store are automatically cached, but avoid overly complex computation logic
+2. **Data Flow**: Recommend unidirectional data flow, modify state through Store methods, bind to fields through `$bind`
+3. **Persistence**: Only persist necessary states, avoid storing sensitive information
+4. **Lifecycle**: Store instances remain alive during application lifecycle, pay attention to cleaning up unnecessary subscriptions in time
+
+Store provides powerful state management capabilities for Signals Form, making complex form state management simple and efficient! ✨

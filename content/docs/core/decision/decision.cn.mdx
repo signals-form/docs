@@ -1,0 +1,33 @@
+---
+title: 决策对象
+description: 表单系统中的条件渲染和逻辑判断
+---
+`Decision` 是一个决策对象。常用于字段的显示与隐藏，以及业务逻辑的处理。
+
+## 基本用法 
+```ts
+import { setup, D } from "@signals-from/core"
+
+const boolConfig = {
+  isDisabled: false,
+  isHidden: () => true,
+  isA:(model) => model.data === 'a',
+}
+
+// 注册 布尔配置
+setup(boolConfig)
+
+const ds = D.and(
+  D.or(
+    'isDisabled',
+    'isHidden'
+  ),
+  D.use('isA')
+)
+
+const model = {
+  data: 'a'
+}
+
+ds.execute(model) // true
+```

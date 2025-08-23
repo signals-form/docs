@@ -1,0 +1,396 @@
+---
+title: "动态配置管理"
+description: "实现表单字段的热更新和动态配置"
+---
+
+## 概述
+
+动态配置管理是 Signals Form 的核心特性之一，它允许你在运行时根据业务逻辑、用户交互或数据变化动态调整表单结构。无论是简单的字段显隐控制，还是复杂的嵌套结构管理，都能轻松应对。
+
+## 核心 API
+
+### `updateFields` - 字段集合管理
+
+用于管理顶层字段集合，支持完全替换、增量更新等操作：
+
+```ts
+// 完全替换字段集合
+form.updateFields(() => [
+  defineField({
+    id: "username",
+    component: Input,
+    label: "用户名",
+    props: { placeholder: "请输入用户名" }
+  }),
+  defineField({
+    id: "email", 
+    component: Input,
+    label: "邮箱",
+    props: { type: "email", placeholder: "请输入邮箱" }
+  })
+])
+
+// 基于现有字段进行更新
+form.updateFields((currentFields) => [
+  ...currentFields,
+  defineField({
+    id: "phone",
+    component: Input,
+    label: "手机号",
+    props: { placeholder: "请输入手机号" }
+  })
+])
+
+// 条件性字段更新
+form.updateFields((fields) => 
+  fields.filter(field => field.id !== "temporaryField")
+)
+```
+
+### `updateProperties` - 嵌套字段管理
+
+专门用于管理对象字段和数组字段的子属性：
+
+```ts
+// 完全重置子字段
+handler.updateProperties(() => [
+  defineField({
+    id: "user.profile.name",
+    component: Input,
+    label: "姓名"
+  }),
+  defineField({
+    id: "user.profile.avatar",
+    component: ImageUpload,
+    label: "头像"
+  })
+])
+
+// 基于现有子字段更新
+handler.updateProperties((currentProperties) => 
+  currentProperties.map(field => {
+    if (field.id === 'user.profile.name') {
+      return {
+        ...field,
+        props: { 
+          ...field.props,
+          placeholder: "请输入真实姓名" 
+        }
+      }
+    }
+    return field
+  })
+)
+```
+## 实践场景
+
+### 1. 渐进式表单构建
+
+构建分步骤的表单，每步动态添加字段：
+
+```ts title="多步骤注册表单"
+interface RegistrationStep {
+  title: string
+  fields: FieldConfig[]
+}
+
+const registrationSteps: Record<string, RegistrationStep> = {
+  basic: {
+    title: "基础信息",
+    fields: [
+      defineField({
+        id: "username",
+        component: Input,
+        label: "用户名",
+        validation: { required: true, minLength: 3 }
+      }),
+      defineField({
+        id: "email",
+        component: Input,
+        label: "邮箱",
+        props: { type: "email" },
+        validation: { required: true, email: true }
+      })
+    ]
+  },
+  profile: {
+    title: "个人资料",
+    fields: [
+      defineField({
+        id: "profile.fullName",
+        component: Input,
+        label: "真实姓名"
+      }),
+      defineField({
+        id: "profile.birthday",
+        component: DatePicker,
+        label: "生日"
+      }),
+      defineField({
+        id: "profile.avatar",
+        component: ImageUpload,
+        label: "头像"
+      })
+    ]
+  },
+  preferences: {
+    title: "偏好设置",
+    fields: [
+      defineField({
+        id: "preferences.newsletter",
+        component: Checkbox,
+        label: "订阅邮件通知"
+      }),
+      defineField({
+        id: "preferences.language",
+        component: Select,
+        label: "语言偏好",
+        props: {
+          options: [
+            { label: "中文", value: "zh-CN" },
+            { label: "English", value: "en-US" }
+          ]
+        }
+      })
+    ]
+  }
+}
+
+// 步骤切换逻辑
+function goToStep(stepName: keyof typeof registrationSteps) {
+  const step = registrationSteps[stepName]
+  
+  // 更新表单标题
+  setFormTitle(step.title)
+  
+  // 动态更新字段
+  form.updateFields(() => step.fields)
+  
+  // 如果是 profile 步骤，需要管理嵌套字段
+  if (stepName === 'profile') {
+    const profileField = form.getField('profile')
+    profileField?.updateProperties(() => [
+      defineField({
+        id: "profile.fullName",
+        component: Input,
+        label: "真实姓名",
+        validation: { required: true }
+      }),
+      defineField({
+        id: "profile.birthday",
+        component: DatePicker,
+        label: "生日"
+      })
+    ])
+  }
+}
+```
+
+### 2. 权限驱动的字段管理
+
+根据用户权限动态显示/隐藏字段：
+
+```ts title="权限控制表单"
+interface UserPermissions {
+  canEditProfile: boolean
+  canViewFinancial: boolean
+  isAdmin: boolean
+}
+
+function updateFormByPermissions(permissions: UserPermissions) {
+  const baseFields = [
+    defineField({
+      id: "name",
+      component: Input,
+      label: "姓名",
+      props: { disabled: !permissions.canEditProfile }
+    }),
+    defineField({
+      id: "email",
+      component: Input,
+      label: "邮箱",
+      props: { disabled: !permissions.canEditProfile }
+    })
+  ]
+
+  // 根据权限添加额外字段
+  const conditionalFields = []
+
+  if (permissions.canViewFinancial) {
+    conditionalFields.push(
+      defineField({
+        id: "financial",
+        component: ObjectField,
+        label: "财务信息",
+        properties: [
+          defineField({
+            id: "financial.salary",
+            component: NumberInput,
+            label: "薪资"
+          }),
+          defineField({
+            id: "financial.bankAccount",
+            component: Input,
+            label: "银行账户"
+          })
+        ]
+      })
+    )
+  }
+
+  if (permissions.isAdmin) {
+    conditionalFields.push(
+      defineField({
+        id: "adminSettings",
+        component: ObjectField,
+        label: "管理员设置",
+        properties: [
+          defineField({
+            id: "adminSettings.role",
+            component: Select,
+            label: "角色",
+            props: {
+              options: [
+                { label: "超级管理员", value: "super" },
+                { label: "普通管理员", value: "admin" }
+              ]
+            }
+          })
+        ]
+      })
+    )
+  }
+
+  // 更新表单字段
+  form.updateFields(() => [...baseFields, ...conditionalFields])
+}
+
+// 权限变化时自动更新
+defineReaction({
+  dependencies: [userPermissions],
+  update: ([permissions]) => {
+    updateFormByPermissions(permissions)
+  }
+})
+```
+### 3. 条件配置表单
+
+基于配置类型动态构建表单：
+
+```ts title="服务配置表单"
+interface ServiceConfig {
+  type: 'database' | 'api' | 'cache' | 'storage'
+  [key: string]: any
+}
+
+const configTemplates = {
+  database: {
+    title: "数据库配置",
+    fields: [
+      defineField({
+        id: "config.host",
+        component: Input,
+        label: "主机地址",
+        validation: { required: true }
+      }),
+      defineField({
+        id: "config.port",
+        component: NumberInput,
+        label: "端口",
+        props: { min: 1, max: 65535 }
+      }),
+      defineField({
+        id: "config.database",
+        component: Input,
+        label: "数据库名",
+        validation: { required: true }
+      }),
+      defineField({
+        id: "config.credentials",
+        component: ObjectField,
+        label: "认证信息",
+        properties: [
+          defineField({
+            id: "config.credentials.username",
+            component: Input,
+            label: "用户名"
+          }),
+          defineField({
+            id: "config.credentials.password",
+            component: PasswordInput,
+            label: "密码"
+          })
+        ]
+      })
+    ]
+  },
+  api: {
+    title: "API 配置",
+    fields: [
+      defineField({
+        id: "config.baseUrl",
+        component: Input,
+        label: "基础URL",
+        props: { type: "url" }
+      }),
+      defineField({
+        id: "config.timeout",
+        component: NumberInput,
+        label: "超时时间(ms)",
+        props: { min: 1000, max: 30000 }
+      }),
+      defineField({
+        id: "config.headers",
+        component: KeyValueEditor,
+        label: "请求头"
+      })
+    ]
+  },
+  cache: {
+    title: "缓存配置", 
+    fields: [
+      defineField({
+        id: "config.ttl",
+        component: NumberInput,
+        label: "过期时间(秒)"
+      }),
+      defineField({
+        id: "config.maxSize",
+        component: NumberInput,
+        label: "最大缓存大小(MB)"
+      })
+    ]
+  }
+}
+
+// 根据服务类型更新配置字段
+defineReaction({
+  field: form.serviceType,
+  update: (handler, serviceType) => {
+    const template = configTemplates[serviceType as keyof typeof configTemplates]
+    
+    if (template) {
+      // 更新配置字段
+      const configField = form.getField('config')
+      configField?.updateProperties(() => template.fields)
+      
+      // 更新表单标题
+      setFormTitle(template.title)
+      
+      // 清理旧的配置值
+      form.setFieldValue('config', {})
+    }
+  }
+})
+```
+## 总结
+
+动态配置管理是构建灵活表单系统的核心能力。通过合理使用 `updateFields`、`updateProperties` 和 `updatePartialProperties`，结合类型安全和性能优化策略，你可以构建出既强大又高效的动态表单系统。
+
+记住关键原则：
+- 🎯 **明确意图**：选择合适的更新方法
+- 🚀 **性能优先**：批量操作，避免频繁更新
+- 🔒 **类型安全**：使用 TypeScript 约束字段路径
+- 🎨 **用户体验**：平滑的过渡和响应式更新
+
+掌握这些技巧，你就能应对各种复杂的动态表单场景！✨

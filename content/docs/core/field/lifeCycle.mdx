@@ -1,0 +1,84 @@
+---
+title: Life Cycle
+description: lifeCycle
+---
+
+## Life Cycle
+
+### `onDisabled`
+  - This function is called when the field is disabled.
+```ts
+const username = defineField().lifeCycle({
+  onDisabled(isDisabled: boolean){
+
+  }
+})
+```
+
+### `onHidden`
+  - This function is called when the field is hidden.
+```ts
+const username = defineField().lifeCycle({
+  onHidden(isHidden: boolean){
+
+  }
+})
+```
+
+### `onValidate`
+  - This function is called when the field is validated.
+```ts
+const username = defineField().lifeCycle({
+  onValidate(type: ValidateType, error: MessageItemWithMultiple){
+
+  }
+})
+```
+
+### `onBeforeInit`
+  - This function is called before the field is initialized.
+```ts
+const username = defineField().lifeCycle({
+  onBeforeInit(){
+
+  }
+})
+```
+
+### `onInit`
+  - This function is called when the field is initialized.
+```ts
+const username = defineField().lifeCycle({
+  onInit(){
+
+  }
+})
+```
+### `onMounted`
+  - This function is called when the **field component** is mounted.
+```ts
+const username = defineField().lifeCycle({
+  onMounted(){
+
+  }
+})
+```
+### `onUnmounted`
+  - This function is called when the **field component** is unmounted.
+```ts
+const username = defineField().lifeCycle({
+  onUnmounted(){
+
+  }
+})
+```
+### `onDestroy`
+  - This function is called when the field is destroyed.
+```ts
+const username = defineField().lifeCycle({
+  onDestroy(){
+
+  }
+})
+```
+

@@ -1,0 +1,63 @@
+---
+title: 生命周期
+---
+
+字段的生命周期函数可以帮助我们在字段状态变化时执行特定的逻辑。以下是一些常用的生命周期函数：
+- **注：** 生命周期函数不可为箭头函数，因为箭头函数会导致 `this` 无法指向 `handler` 对象。
+
+# lifeCycle
+
+## `onHidden`
+  - 当字段隐藏时，会调用此函数
+```ts
+const username = defineField({
+  // ...
+  lifeCycle: {
+    onHidden(isHidden: boolean){
+
+    }
+  }
+})
+```
+
+## `onDisabled`
+  - 当字段禁用时，会调用此函数
+```ts
+const username = defineField({
+  // ...
+  lifeCycle: {
+    onDisabled(isDisabled: boolean){
+
+    }
+  }
+})
+```
+
+## `onValidate`
+  - 当字段验证时，会调用此函数
+```ts
+const username = defineField({
+  // ...
+  lifeCycle: {
+    onValidate(type: ValidateType, error: MessageItemWithMultiple){
+
+    }
+  }
+})
+```
+## `onBeforeInit`
+  - 在字段初始化之前，会调用此函数
+
+## `onInit`
+  - 在字段初始化时，会调用此函数
+
+## `onMounted`
+  - 在**字段组件**挂载时，会调用此函数
+
+## `onUnmounted`
+  - 在**字段组件**卸载时，会调用此函数
+
+## `onDestroy`
+  - 在字段销毁时，会调用此函数
+
+

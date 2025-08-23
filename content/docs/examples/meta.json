@@ -1,0 +1,14 @@
+{
+  "title": "Examples",
+  "description": "Examples of using signals-form.",
+  "root": true,
+  "icon": "FileBox",
+  "pages": [
+    "index",
+    "login",
+    "edit",
+    "boolless",
+    "relation",
+    "reaction"
+  ]
+}

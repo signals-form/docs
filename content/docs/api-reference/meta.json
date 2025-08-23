@@ -1,0 +1,10 @@
+{
+  "title": "Api Reference",
+  "description": "Api Reference for Signals Form",
+  "icon": "NotebookText",
+  "root": true,
+  "pages": [
+    "---Introduction---",
+    "index"
+  ]
+}

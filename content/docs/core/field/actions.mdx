@@ -1,0 +1,70 @@
+---
+title: Value Actions
+description: Value actions of a field in the form
+---
+
+`actions` is an object that defines the behavior of a field. It has two properties: `onDefaultValue` and `onSubmitValue`.
+
+## onDefaultValue
+- `onDefaultValue` is a function or an object used to set the default value of the field.
+- If it's an object, it should contain a `dependencies` property and `handler` to specify the default value.
+  - `dependencies` is an array used to specify dependent fields.
+  - `handler` is a function used to calculate the default value. The first parameter is the field's initial value, and the second parameter is the collection of dependency values.
+
+```ts
+// only function
+const username = defineField({
+  id: "username",
+  component: Input,
+  initialValue: "initialValue",
+  actions: {
+    onDefaultValue: (value) => "default value",
+  }
+})
+
+// dependencies
+const username = defineField({
+  id: "username",
+  component: Input,
+  initialValue: "initialValue",
+  actions: {
+    onDefaultValue:{
+      dependencies: ["otherField"],
+      handler: (initialValue, [otherFieldValue]) => {
+        return otherFieldValue ? "default value" : initialValue;
+      }
+    },
+  }
+})
+```
+
+## onSubmitValue
+- `onSubmitValue` is a function or an object used to set the submit value of the field.
+- If it's an object, it should contain a `dependencies` property and `handler` to specify the submit value.
+  - `dependencies` is an array used to specify dependent fields.
+  - `handler` is a function used to transform the submitted value. The first parameter is the field's initial value, and the second parameter is the collection of dependency values.
+
+```ts
+// only function
+const username = defineField({
+  id: "username",
+  component: Input,
+  actions: {
+    onSubmitValue: (value) => value
+  }
+})
+
+// dependencies
+const username = defineField({
+  id: "username",
+  component: Input,
+  actions: {
+    onSubmitValue: {
+      dependencies: ["otherField"],
+      handler: (value, [otherFieldValue]) => {
+        return !otherFieldValue ? "default submit value" : String(value).toUpperCase();
+      }
+    }
+  }
+})
+```

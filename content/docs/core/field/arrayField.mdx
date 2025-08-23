@@ -1,0 +1,151 @@
+---
+title: Array Field
+description: Array fields for handling dynamic lists
+---
+
+Array fields are commonly used to handle a group of data of the same type, often used for processing lists, tables, and other complex data structures. For example, user interests, skill tags, etc. In forms, array fields allow users to dynamically add, delete, and sort a group of form items with the same structure for more flexible information collection.
+- Use `defineArrayField` to define array fields.
+- Child fields must be non-`void` fields
+
+## Core Capabilities
+
+1. Dynamic add/remove items: Support adding or removing elements from the array at runtime
+2. Sorting capability: Allow drag-and-drop sorting of array elements
+3. Batch operations: Support batch adding, deleting, or modifying multiple items
+4. Nested structure: Can nest other fields, including other ArrayFields
+5. Independent validation: Each array item can have independent validation rules
+
+## itemType
+
+- `itemType` is used to specify the type of elements in the array, default is `object`, with types `object`, `array`, `primitive`.
+
+- `object`: Indicates that array elements are object types, typically used for complex data structures.
+```ts
+defineArrayField({
+  // ...
+  itemType: "object",
+  properties: [
+    name,
+    age
+  ]
+})
+ 
+// value: [ { name: "cherry" , age: 18 } ]
+```
+- `array`: Indicates that array elements are array types, suitable for nested array scenarios.
+```ts
+defineArrayField({
+  // ...
+  itemType: "array",
+  properties: [
+    name,
+    age
+  ]
+})
+
+// value: [ [ "cherry" , 18 ] ]
+```
+- `primitive`: Indicates that array elements are primitive types, suitable for simple data types such as strings, numbers, etc.
+- Note: Only supports one child field, cannot have multiple fields
+
+```ts
+defineArrayField({
+  // ...
+  itemType: "primitive",
+  properties: [
+    name
+  ]
+})
+
+// value: [ "cherry" ]
+```
+
+## Dynamic Contact List
+
+```ts
+import { defineArrayField, defineField } from "@signals-form/core"
+
+const name = defineField({
+  id: "name",
+  component: Input,
+  props: {
+    label: "Name",
+    placeholder: "Please enter friend's name",
+  },
+});
+
+const age = defineField({
+  id: "age",
+  component: InputNumber,
+  props: {
+    label: "Age",
+    type: "number",
+    placeholder: "Please enter friend's age"
+  },
+});
+
+const friendsField = defineArrayField({
+  id: "friends",
+  component: ArrayField,
+  props: {
+    label: "Friends List"
+  },
+  initialValue: [
+    { name: "Tom", age: 20 },
+    { name: "Jerry", age: 18 }
+  ],
+  properties: [
+    name,
+    age
+  ],
+});
+```
+- In the component, handlers API will be injected for various array operations such as push, pop, shift, move, etc.
+- When rendering array nodes, one element in the array is one Node
+
+```tsx
+import React from 'react';
+import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons';
+import { Button, Form, Space } from 'antd';
+
+interface Props {
+  label?: string;
+  value?: any[];
+  handlers: any,
+  fields: any[],
+  children?: React.ReactNode[][];
+}
+export const ArrayField: React.FC<Props> = ({
+  children,
+  value,
+  handlers,
+  messages,
+  label
+}: Props) => {
+  return <div>
+    {label && <div style={{marginBottom: '8px'}}>{label}:</div>}
+    <Form.List name={'names'} initialValue={value}>
+      {() => {
+        return <>
+          {
+            children?.map((node, index) => {
+              return <div key={index}>
+                <Space style={{ display: 'flex', marginBottom: 8 }} align="baseline">
+                  {
+                    node
+                  }
+                  <MinusCircleOutlined onClick={() => handlers.remove(index)} />
+                </Space>
+              </div>
+            }) ?? null
+          }
+          <Form.Item>
+            <Button type="dashed" onClick={() => handlers.push({})} block icon={<PlusOutlined />}>
+              Add field
+            </Button>
+          </Form.Item>
+        </>
+      }}
+    </Form.List>
+  </div>
+}

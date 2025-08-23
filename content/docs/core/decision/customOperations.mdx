@@ -1,0 +1,49 @@
+---
+title: Custom Operators
+description: Advanced logical operators for complex decision making
+---
+
+- `nand`: NAND operator, only returns `true` when all conditions are `false`.
+- `nor`: NOR operator, only returns `true` when all conditions are `false`.
+
+## `nand`
+- The `nand` operator is used to determine whether all conditions are `false`, i.e., only when all conditions are `false`, the result is `true`.
+
+```ts
+import { D, registerCustomOperator } from "@signals-form/core"
+const model = {
+  isA: true,
+  isB: false,
+}
+registerCustomOperator(
+  "nand",
+  function (...bools: boolean[]) {
+    return !bools.every(Boolean);
+  }
+)
+
+D.nand('isA', 'isB').execute(model) // !(isA && isB) true
+```
+
+## `nor`
+- The `nor` operator is used to determine whether all conditions are `false`, i.e., only when all conditions are `false`, the result is `true`.
+
+```ts
+import { D, registerCustomOperator} from "@signals-form/core"
+const model = {
+  isA: true,
+  isB: false,
+}
+
+registerCustomOperator(
+  "nor",
+  function (...bools: boolean[]) {
+    return !bools.some(Boolean);
+  }
+)
+D.nor('isA', 'isB').execute(model) // !(isA || isB) false
+```
+
+## Note:
+- These operators involve a secondary calculation process, which can significantly increase complexity and mental burden for developers when using them. Please use with caution.
+- It's recommended to use basic operators such as `and`, `or`, `not`, `use` to simplify decision logic. `nand` can be implemented using `not` and `and` combination, `nor` can be implemented using `not` and `or` combination.

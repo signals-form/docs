@@ -1,0 +1,38 @@
+---
+title: Void Field
+description: Void fields for layout
+---
+- VoidField is designed in the form system to handle complex layouts. It doesn't have a Value property, and its bound bridge component can be used to control the display and hiding of data-type fields
+
+- Use `defineVoidField` to define void fields.
+
+## Example
+
+```tsx
+const Container = (
+  { children, label, ...props }: { children: ReactNode, label: string }
+) => {
+  return (
+    <div>
+      {label && <div>{label}</div>}
+      <Space {...props}>
+        {children}
+      </Space>
+    </div>
+  );
+};
+
+const contactInfo = defineVoidField({
+  id: "contactInfo",
+  component: Container,
+  props: {
+    label: "Contact Information",
+    direction: 'vertical'
+  },
+  properties: [
+    email,
+    phone,
+    wechat
+  ]
+});
+```

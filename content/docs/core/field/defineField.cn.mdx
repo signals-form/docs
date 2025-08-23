@@ -1,0 +1,63 @@
+---
+title: 定义字段
+---
+
+字段是表单的基本组成单元，它具有的名称、校验器等信息。字段的表达可以是一个输入框、选择框、单选框，亦或者是一个Modal等等，具备复杂表达的组件。
+
+## 普通字段
+- 使用 `defineField` 定义一个字段。`Field` 对象包含了字段的名称、类型、描述等信息。
+
+```ts
+import { defineField } from '@signals-form/core'
+
+const username = defineField({
+  // ...
+})
+```
+
+## 数组字段
+- 使用 `defineArrayField` 定义一个字段。`ArrayField` 对象包含了字段的名称、类型、描述等信息。
+
+```ts
+import { defineArrayField } from '@signals-form/core'
+
+const hobbies = defineArrayField({
+  // ...
+})
+
+```
+
+## 布局字段
+- 使用 `defineVoidField` 定义一个字段。`VoidField` 对象包含了字段的名称、类型、描述等信息。布局字段通常用于布局组件，比如卡片、分割线等。
+
+```ts
+import { defineVoidField } from '@signals-form/core'
+
+const loginCard = defineVoidField({
+  // ...
+})
+```
+
+## 类型
+使用 `defineField` 时，它具有两个泛型
+- 第一个泛型，表示字段的值的类型。可以是 `string`、`number`、`boolean`、`object`、`array` 等。
+- 第二个泛型，表示字段的Props的类型。默认为 `Record<string, any>`。
+
+```ts
+import { defineField } from '@signals-form/core'
+import Input from './components/Input'
+
+interface InputProps {
+  label: string
+  placeholder: string
+}
+
+const username = defineField<string, InputProps>({
+  id: "username",
+  component: Input,
+  props: {
+    label: '用户名',
+    placeholder: '请输入用户名'
+  }
+})
+```

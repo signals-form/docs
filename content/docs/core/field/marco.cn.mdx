@@ -1,0 +1,61 @@
+---
+title: "状态宏"
+---
+
+专为 `props` 准备的状态语法，可以使用状态宏使得 `prop` 与外界的 `Signal` 对象进行绑定。
+
+- 状态宏有两种，分别是 `$bind` 单向的绑定，`$model` 双向绑定。
+
+### $bind
+- `$bind` 单向的绑定，当 `signal` 更新后，`prop` 也会随着更新。
+- `$bind` 的入参可以是一个 `Computed` 对象、`Signal` 对象、函数。
+- **注**：单向绑定时，在字段中的 `handler` 去设置 `prop` 的值时会报错，因为对于字段来讲，此时prop是一个只读的值。
+```ts
+import { defineField, $bind } from "@signals-form/core"
+import { signal } from "alien-deepSignals"
+
+const label = signal('username')
+
+const username = defineField({
+  id: "username",
+  component: Input,
+  props: {
+    label: $bind(label)
+  },
+  events: {
+    onChange(value){
+      this.setState("label", value) // ❌ This property is bound via $bind and is read-only. Use the source field's setState/setAsyncState methods instead.
+    }
+ }
+})
+```
+
+### $model
+- `$model` 双向绑定，只要 `prop` 或者 `signal` 中其中一个触发更新，则都会更新。
+- `$model` 的入参可以是一个 `Signal` 对象、或者一个返回 `Signal` 对象的函数。
+
+```ts
+import { defineField, $model } from "@signals-form/core"
+import { signal } from "alien-deepsignals"
+
+const label = signal('username')
+
+const username = defineField({
+  id: "username",
+  component: Input,
+  props: {
+    label: $model(label)
+  },
+ events: {
+   onChange(value){
+      this.setState('value', value)
+      this.setState('label', value) // 可更新label signal的值
+   }
+ }
+})
+
+setTimeout(() => {
+  label.value = 'Username' // 更新label signal的值
+}, 1000);
+
+```

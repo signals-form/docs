@@ -1,0 +1,166 @@
+---
+title: 基础配置
+---
+
+## id、name
+
+- `id` 是字段的在表单中的唯一标识，必须是一个字符串，在模型中默认使用 `name` 作为数据录入和字段路径计算，name默认值为id
+- 有了id为啥还需要name呢？因为有些字段的名字是一致的，需要区分开来，例如，老师信息，学生信息下，都有 姓名这个字段
+
+```ts
+const teachername = defineField({
+    id: "teachername",
+    name: "username"
+})
+
+const studentname = defineField({
+    id: "studentname",
+    name: "username"
+})
+```
+
+## component
+`component` 是字段在页面中的表达，所渲染的组件，必须是一个受控组件，必须有 `value` 和 `onChange` 属性。`value` 是字段的值，`onChange` 是字段的值改变时的回调函数。
+
+```ts
+const username = defineField({
+    id: "username",
+    component: Input
+  })
+```
+
+### 受控组件
+受控组件是指组件的值由外部控制，组件的值通过 `props` 传递给组件。组件的值改变时，调用 `onChange` 回调函数，将新的值传递给外部。
+
+```tsx
+export default function Input(props: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+}) {
+  return <div>
+    <label>{props.label}: </label>
+    <input
+      type="text"
+      value={props.value}
+      onChange={(e) => props.onChange(e.target.value)}
+    />
+  </div>
+}
+```
+
+## 初始值
+
+`initialValue` 是字段的初始值，可以是任意类型。`initialValue` 可以是一个函数，也可以是一个Promise。
+
+```ts
+const username = defineField({
+    id: "username",
+    component: Input,
+    initialValue: "admin"
+  })
+```
+
+## props
+
+`props` 是字段的属性，必须是一个对象。`props` 中的属性会传递给组件。`props` 中的属性可以是任意类型。
+
+```ts
+const username = defineField({
+    id: "username",
+    component: Input,
+    props: {
+        label: "用户名"
+    }
+  })
+```
+
+## properties
+`properties` 是字段的子字段集合，必须是一个数组。`properties` 中的每个元素都是一个字段对象。
+```ts
+const username = defineField().basicConfig({
+  id: "username",
+  component: Input
+})
+
+const password = defineField().basicConfig({
+  id: "password",
+  component: Input
+})
+
+const account = defineField({
+    id: "account",
+    component: Form,
+    properties: [
+      username,
+      password
+    ]
+})
+```
+
+## hidden
+
+- `hidden` 是一个 `Decision` 对象，表示字段是否禁用。`hidden` 也可以是一个函数。函数的参数是，仅具备读操作的 `handler` ，返回值是一个布尔值。默认值是 false。
+
+- **注**：此选项具备响应式能力，不需要手动设置字段的隐藏与否
+
+```ts
+import { defineField, D } from "@signals-form/core"
+const username = defineField({
+    id: "username",
+    component: Input,
+    hidden: D.use('isHidden')
+})
+```
+
+### hidden行为
+
+- `hidden` 可以是一个配置对象，可以用来配置，字段隐藏后，字段值的删除与恢复，以及其子组件是否保活，在表单提交时，隐藏的字段是否也需要提交。
+- `when` 是一个 `Decision` 对象，表示字段是否隐藏。`hidden` 也可以是一个函数。函数的参数是 `Field` 的`value` 以及表单模型 `model` ，返回值是一个布尔值。`hidden` 的默认值是 `false`。
+- `activityOnHidden` 为 `true`时，表示当字段隐藏时，搭配 `Activity` 组件，对其字段组件进行保活，使得组件是不会被卸载，只会隐藏，默认为 `false`。
+- `removeValueOnHidden` 为 `true`时，表示当字段隐藏时，字段的 `value` 会被删除，也就是置为 `undefined`，默认为 `true`。
+- `recoverValueOnShown` 为`true`时，表示字段由隐藏转为显示时，字段的 `value` 会回填为隐藏时的值，默认为 `false`。
+- `submitOnHidden` 为`true`时，表示字段隐藏时，表单提交时，也会被提交。
+
+```ts
+{
+		when: D.and("isJerry", "is18"),
+		behavior: {
+			activityOnHidden: true,
+			removeValueOnHidden: true,
+			recoverValueOnShown: true,
+			submitOnHidden: false
+		},
+}
+```
+
+## disabled
+- `disabled` 是一个 `Decision` 对象，表示字段是否禁用。`disabled` 也可以是一个函数。函数的参数是，仅具备读操作的 `handler` ，返回值是一个布尔值。默认值是 false。
+- **注**：此选项具备响应式能力，不需要手动设置字段的禁用与否
+
+```ts
+import { defineField, D } from "@signals-form/core"
+const username = defineField({
+    id: "username",
+    component: Input,
+    disabled: D.use('isDisabled')
+  })
+```
+
+## 事件处理
+- `events` 是一个对象，表示字段的事件处理函数。`events` 中的每个属性都是一个事件处理函数。
+- 事件处理函数的 `this` 指向当前字段的 `handler` 对象，可以通过 `this.setState` 或 `this.setAsyncState` 来更新字段的状态。还有其他的状态和方法在后面的章节中会介绍。
+- **注**：事件处理函数不可以是箭头函数，因为箭头函数的 `this` 指向的是定义时的上下文，而不是事件触发时的上下文。
+
+```ts
+import { defineField } from "@signals-form/core"
+const username = defineField({
+    id: "username",
+    component: Input,
+    events: {
+        onChange(value) {
+            this.setState('value', value)
+        }
+    }
+})
+```

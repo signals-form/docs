@@ -1,0 +1,311 @@
+---
+title: Quick Start
+description: Build your first reactive form
+---
+
+## Welcome to Signals Form
+
+Signals Form combines declarative APIs with powerful field linkage for seamless integration, providing developers with flexible validation mechanisms, excellent performance, and comprehensive support for various frontend frameworks.
+
+<Cards>
+
+<Card icon={<CpuIcon className="text-purple-300" />} title='Form Core'>
+
+The core engine of forms, providing state management, validation, and linkage capabilities, serving as the foundation of the entire form system.
+
+</Card>
+
+<Card icon={<PanelsTopLeft className="text-blue-300" />} title='Form Devtools'>
+
+Powerful development debugging tools that help developers monitor form state changes in real-time and quickly identify and resolve issues.
+
+</Card>
+
+<Card icon={<Database />} title='Form Graph'>
+
+Intuitive graphical tools that visualize form structure and relationships, making complex form design simple.
+
+</Card>
+
+<Card icon={<Terminal />} title='Form Relation'>
+
+Professional relationship processing system that easily handles complex dependencies and linkage relationships between fields.
+
+</Card>
+
+</Cards>
+
+<Callout title="Want to explore more features?">
+  Check out our detailed [Core Concepts Documentation](/docs/core) to learn more about advanced features.
+</Callout>
+
+## Core Features
+
+- ✨ **Reactive State Management**: Efficient state management based on Signals with automatic dependency tracking
+- 🛡️ **Powerful Form Validation**: Flexible validators supporting mainstream validation libraries like Zod and Yup
+- 🔄 **Smart Field Linkage**: Easily define dependencies between fields and implement complex form linkage logic
+- 🧩 **Component-based Design**: Seamless integration with React, Vue, Svelte, and other frameworks
+- 🚀 **Ultimate Performance**: Precise update strategy avoiding unnecessary re-renders
+- 🔗 **Powerful Field Relations**: Support complex relationships and data flow between fields
+
+## Quick Start
+
+### Installation
+
+Choose the package manager suitable for your project to install Signals Form:
+
+<Tabs groupId='package-manager' persist items={['npm', 'pnpm', 'yarn', 'bun']}>
+
+```bash tab="npm"
+npm install @signals-form/core @signals-form/react
+```
+
+```bash tab="pnpm"
+pnpm install @signals-form/core @signals-form/react
+```
+
+```bash tab="yarn"
+yarn add @signals-form/core @signals-form/react
+```
+
+```bash tab="bun"
+bun install @signals-form/core @signals-form/react
+```
+
+</Tabs>
+
+### Step 1: Define Fields
+
+Create a username field with validation functionality:
+
+```ts title="src/fields/username.ts"
+import { defineField } from "@signals-form/core"
+import { z } from "zod"
+import { Input } from "./components/Input"
+
+export const username = defineField({
+  id: "username",
+  component: Input,
+  props: {
+    label: "Username",
+    placeholder: "Please enter your username"
+  },
+  validators: z.string().min(3, "Username must be at least 3 characters").max(20, "Username cannot exceed 20 characters")
+})
+```
+
+### Step 2: Create Input Component
+
+Implement an Input component that links with the form system:
+
+```tsx title="src/components/Input.tsx"
+import type { Messages } from "@signals-form/core"
+
+interface InputProps {
+  label: string
+  placeholder: string
+  value: string
+  messages: Messages
+  onChange: (value: string) => void
+}
+
+export function Input({ label, placeholder, value, messages, onChange }: InputProps) {
+  const errorMessages = messages.error
+    ?.map(item => Object.values(item).map(err => err.message).join(", "))
+    .join(", ")
+
+  return (
+    <div>
+      <label>{label}</label>
+      <input
+        type="text"
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      {errorMessages && (
+        <span className="error-message">{errorMessages}</span>
+      )}
+    </div>
+  )
+}
+```
+
+### Step 3: Assemble Form
+
+Combine fields through `defineForm` to build a complete form:
+
+```tsx title="src/components/LoginForm.tsx"
+import { useCallback } from "react"
+import { defineForm } from "@signals-form/core"
+import { FormControl } from "@signals-form/react"
+import { zodResolver } from "@signals-form/resolvers"
+import { username } from "../fields/username"
+
+// Define form
+const loginForm = defineForm({
+  id: "LoginForm",
+  defaultValidatorEngine: "zod",
+  fields: [username],
+  resolvers: {
+    validator: {
+      zod: zodResolver,
+    },
+  },
+})
+
+export function LoginForm() {
+  const handleSubmit = useCallback(async () => {
+    const { messages, model } = await loginForm.submit()
+    
+    if (!messages) {
+      console.log("Validation passed, form data:", model)
+      // Handle login logic
+    } else {
+      console.log("Form validation failed:", messages)
+    }
+  }, [])
+
+  return (
+    <div className="login-form">
+      <h2>User Login</h2>
+      <FormControl form={loginForm} />
+      <button 
+        onClick={handleSubmit}
+        className="submit-button"
+      >
+        Login
+      </button>
+    </div>
+  )
+}
+```
+
+### Step 4: Use in Application
+
+```tsx title="src/App.tsx"
+import { LoginForm } from "./components/LoginForm"
+
+export function App() {
+  return (
+    <div className="app">
+      <LoginForm />
+    </div>
+  )
+}
+```
+
+## Add More Fields
+
+Let's extend the form by adding password fields and field linkage:
+
+```ts title="src/fields/password.ts"
+import { defineField, defineReaction } from "@signals-form/core"
+import { z } from "zod"
+import { Input } from "../components/Input"
+
+export const password = defineField({
+  id: "password",
+  component: Input,
+  props: {
+    label: "Password",
+    placeholder: "Please enter your password",
+    type: "password"
+  },
+  validators: z.string().min(6, "Password must be at least 6 characters")
+})
+
+export const confirmPassword = defineField({
+  id: "confirmPassword", 
+  component: Input,
+  props: {
+    label: "Confirm Password",
+    placeholder: "Please enter your password again",
+    type: "password"
+  },
+  validators: z.string().min(1, "Please confirm your password")
+})
+
+export const confirmPassword = defineField({
+  id: "password",
+  component: Input,
+  props: {
+    label: "Password",
+    placeholder: "Please enter your password",
+    type: "password"
+  },
+  validators: [
+    defineValidator()
+      .schema(z.string().min(6, "Password must be at least 6 characters!")),
+
+    defineValidator()
+      .passive()
+      .custom(({ query })=>{
+        const password = query('password')
+        const confirmPassword = query('confirmPassword')
+        if (password.isDirty && confirmPassword.isTouched && password.value !== confirmPassword.value) {
+          return { message: "The two passwords do not match!", type: "error" }
+        }
+    })
+  ]
+})
+```
+
+Update form definition:
+
+```ts title="src/components/LoginForm.tsx"
+import { username } from "../fields/username"
+import { password, confirmPassword, passwordMatchReaction } from "../fields/password"
+
+const loginForm = defineForm({
+  id: "LoginForm",
+  defaultValidatorEngine: "zod",
+  fields: [username, password, confirmPassword],
+  effects: {
+    reactions: [passwordMatchReaction], // Add field linkage
+  },
+  resolvers: {
+    validator: {
+      zod: zodResolver,
+    },
+  },
+})
+```
+
+## Next Steps
+
+Congratulations! You have successfully created your first Signals Form. Now you can:
+
+<Cards>
+  <Card
+    href="/docs/core/field/defineField"
+    title="Deep Dive into Fields"
+    description="Learn field definition, property configuration, and lifecycle management"
+  />
+  <Card
+    href="/docs/core/validation"
+    title="Master Form Validation"
+    description="Learn how to implement complex form validation logic and custom validators"
+  />
+  <Card
+    href="/docs/core/relation"
+    title="Field Linkage Control"
+    description="Master dependencies between fields and implement linkage logic"
+  />
+  <Card
+    href="/docs/examples"
+    title="View Examples"
+    description="Browse more form usage cases from real projects"
+  />
+</Cards>
+
+## Get Help
+
+Having issues? We're here to help:
+
+- 📖 [Complete Documentation](/docs/core) - View detailed API documentation and usage guides
+- 💬 [GitHub Discussions](https://github.com/signals-form/signals-form/discussions) - Discuss with the community
+- 🐛 [GitHub Issues](https://github.com/signals-form/signals-form/issues) - Report bugs or suggest features
+- 🚀 [Example Code](https://github.com/signals-form/signals-form/tree/main/examples) - View more practical examples
+
+Let's build better form experiences together! ✨

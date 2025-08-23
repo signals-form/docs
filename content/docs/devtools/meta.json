@@ -1,0 +1,10 @@
+{
+  "title": "Devtools",
+  "description": "Devtools for Signals Form",
+  "icon": "DraftingCompass",
+  "root": true,
+  "pages": [
+    "---Introduction---",
+    "index"
+  ]
+}
