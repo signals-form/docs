@@ -196,7 +196,7 @@ export function ContactForm() {
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-              <DynamicLink href="/docs/core">
+              <DynamicLink href="/cn/docs/core">
                 <button 
                   type="button"
                   className="cursor-pointer bg-black dark:bg-white text-white dark:text-black px-8 py-3 rounded-2xl font-semibold text-lg hover:bg-gray-800 dark:hover:bg-gray-100 transition-all duration-300"
@@ -205,7 +205,7 @@ export function ContactForm() {
                 </button>
               </DynamicLink>
 
-              <DynamicLink href="https://github.com/CCherry07/signals-form">
+              <DynamicLink href="https://github.com/CCherry07">
                 <button 
                   type="button"
                   className="cursor-pointer border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white px-8 py-3 rounded-2xl font-semibold text-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-all duration-300"

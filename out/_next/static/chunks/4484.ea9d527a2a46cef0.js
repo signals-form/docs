@@ -1,1 +1,0 @@
-"use strict";(self.webpackChunk_N_E=self.webpackChunk_N_E||[]).push([[4484],{14484:(e,a,s)=>{s.r(a),s.d(a,{createOnigurumaEngine:()=>t.Mk,getDefaultWasmLoader:()=>t.X,loadWasm:()=>t.ti,setDefaultWasmLoader:()=>t.xz});var t=s(46086)}}]);
