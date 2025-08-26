@@ -6,6 +6,15 @@ const withMDX = createMDX();
 const config = {
   output: "export",
   reactStrictMode: true,
+  redirects(){
+    return [
+      {
+        source: '/en',
+        destination: '/',
+        permanent: true,
+      },
+    ]
+  }
 };
 
 export default withMDX(config);

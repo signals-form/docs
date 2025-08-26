@@ -9,6 +9,10 @@ export const source = loader({
   baseUrl: "/docs",
   i18n,
   source: docs.toFumadocsSource(),
+  url(slugs, locale) {
+    if (locale) return '/' + [locale, 'docs', ...slugs].join('/');
+    return '/' + ['docs', ...slugs].join('/');
+  },
   icon(icon) {
     if (!icon) {
       // You may set a default icon

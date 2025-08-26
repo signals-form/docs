@@ -14,9 +14,11 @@ import {
 import type { MDXComponents } from "mdx/types";
 import { Preview } from "./components/preview";
 import { Mermaid } from "./components/mermaid"
+import { Card } from "./components/card"
 export function getMDXComponents(components?: MDXComponents): MDXComponents {
 	return {
 		...defaultComponents,
+		Card,
 		Accordions,
 		CpuIcon,
 		Accordion,

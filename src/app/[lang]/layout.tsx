@@ -4,9 +4,12 @@ import "../../styles/global.css"
 import type { ReactNode } from 'react';
 import SearchDialog from "../../components/search"
 
-import { source } from '@/lib/source';
+import { i18n } from '@/lib/i18n';
+
 export function generateStaticParams() {
-  return source.generateParams();
+  return i18n.languages.map((lang) => ({
+    lang,
+  }));
 }
 
 const inter = Inter({
