@@ -88,7 +88,7 @@ export default async function Layout({
 	children: ReactNode;
 }) {
 	const { lang } = await params;
-	const options = baseOptions();
+	const options = baseOptions({ lang });
 	return (
 		<DocsLayout
 			{...options}

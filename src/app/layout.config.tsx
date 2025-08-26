@@ -52,10 +52,11 @@ export function linkItems(locale: string): BaseLayoutProps['links'] {
   ]
 }
 
-export function baseOptions(): BaseLayoutProps {
+export function baseOptions({ lang }: { lang: string }): BaseLayoutProps {
   return {
     i18n,
     nav: {
+      url: lang === "en" ? "/" : "/cn",
       title: (
         <>
           <span className="font-medium [.uwu_&]:hidden [header_&]:text-[15px]">

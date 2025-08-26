@@ -11,5 +11,5 @@ export default async function Layout({
 }) {
 	const { lang } = await params;
 
-	return <HomeLayout {...baseOptions()} links={linkItems(lang)}>{children}</HomeLayout>;
+	return <HomeLayout {...baseOptions({lang})} links={linkItems(lang)}>{children}</HomeLayout>;
 }
