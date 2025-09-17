@@ -53,7 +53,7 @@ const relation = defineRelation({
 |--------|------|---------|-------------|
 | `isImmediate` | `boolean` | `false` | Whether to execute immediately (trigger on initialization) |
 | `once` | `boolean` | `false` | Whether to execute only once |
-| `dirtyIgnore` | `boolean` | `false` | Whether to ignore dirty value updates (always execute update) |
+| `dirtyIgnore` | `boolean` | `true` | Whether to ignore dirty value updates (always execute update) |
 
 ### Update Function
 
@@ -339,7 +339,7 @@ export interface Relation<
     once?: boolean;
     /** If true, the relation will be triggered immediately */
     immediate?: boolean;
-    /** If true, the relation will be allowed to skip updates multiple times, default is false */
+    /** If true, the relation will be allowed to skip updates multiple times, default is true */
     dirtyIgnore?: boolean;
     // support for debounce and throttle ?
   };

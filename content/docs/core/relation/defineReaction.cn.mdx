@@ -39,7 +39,7 @@ const reaction = defineReaction({
 |------|------|--------|------|
 | `immediate` | `boolean` | `false` | 是否立即执行（初始化时就触发） |
 | `once` | `boolean` | `false` | 是否只执行一次 |
-| `dirtyIgnore` | `boolean` | `false` | 是否忽略脏值更新（跳过多次执行的优化） |
+| `dirtyIgnore` | `boolean` | `true` | 是否忽略脏值更新（跳过多次执行的优化） |
 
 ### 更新函数
 
@@ -167,25 +167,25 @@ const initReaction = defineReaction({
 
 ### 脏值检查控制
 
-默认情况下，为了优化性能，系统会跳过相同值的重复更新。使用 `dirtyIgnore` 可以跳过这个优化：
+默认情况下，为了优化性能，系统会跳过重复更新。使用 `dirtyIgnore` 可以跳过这个优化：
 
 ```ts
 const cacheReaction = defineReaction({
   field: cache,
   dependencies: [input],
   update: (handler, [inputValue]) => {
-    // 设置 dirtyIgnore: true 后，即使输入值相同，也会执行更新
+    // 设置 dirtyIgnore: true 后，多次触发时，只有最后一次生效
     handler.setState('value', `cached_${inputValue}_${Date.now()}`)
   },
   options: {
-    dirtyIgnore: true  // 忽略脏值检查，即使值相同也执行更新
+    dirtyIgnore: true // 多次触发时，只有最后一次生效
   }
 })
 ```
 
 **工作原理：**
-- `dirtyIgnore: false`（默认）：如果依赖字段的值没有变化，跳过更新函数的执行
-- `dirtyIgnore: true`：无论依赖字段的值是否变化，都执行更新函数
+- `dirtyIgnore: true`（默认）：当多次执行时，会跳过前面的执行，只有最后一次执行会生效
+- `dirtyIgnore: false`：当多次执行时，每次都会执行更新函数
 
 ### 取消异步操作
 
@@ -225,7 +225,7 @@ const searchReaction = defineReaction({
 ## 注意事项
 
 1. **循环依赖**：系统支持循环依赖，但请确保不要在更新函数中修改 `value` 属性，否则会造成无限循环
-2. **性能考虑**：默认的脏值检查有助于性能优化，除非必要（如需要基于时间戳等动态值更新），不建议设置 `dirtyIgnore: true`
+2. **性能考虑**：默认的脏值检查有助于性能优化，除非必要（如需要基于时间戳等动态值更新），不建议设置 `dirtyIgnore: false`
 3. **异步处理**：对于异步更新，务必处理 AbortSignal 以避免内存泄漏和竞态条件
 4. **多对多联动**：尽量避免多对多的联动模式，优先使用多对一的方式
 

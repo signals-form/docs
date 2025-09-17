@@ -100,6 +100,67 @@ const account = defineField({
 })
 ```
 
+
+## slotMode
+- slot mode refers to the way a subfield of a field is rendered in a component by default subfields are rendered in the component as child elements of the component when the `slotMode` of a field is `true` the subfields representing the field are passed to the component as the component's `props` allowing the component to decide how to render the subfields themselves.
+- `slotName`: the name of the slot used to identify the slot in the form default is field `id`.
+- `slotMode`: slot mode used to control the rendering method of slots.
+
+```ts
+const firstName = defineField({
+	id: "firstName",
+	component: Input,
+	props: {
+		label: "firstName",
+		prefix: "👤",
+		required: true,
+	},
+});
+
+const lastName = defineField({
+	id: "lastName",
+	component: Input,
+	props: {
+		label: "lastName",
+		prefix: "👤",
+		required: true,
+	},
+});
+
+const usernameLayout = defineVoidField({
+	id: "usernameLayout",
+	component: Flex,
+	slotMode: true,
+	hidden: (handler) => {
+		return handler.queryState(age)?.value > 18;
+	},
+	properties: [firstName, lastName],
+	props: {
+		vertical: false,
+	}
+});
+
+function Flex(props: {
+  firstName?: RectNode;
+  lastName?: RectNode;
+  vertical?: boolean;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: props.vertical ? "column" : "row",
+        alignItems: "center",
+        gap: 8,
+      }}
+    >
+    {props.firstName}
+		{props.lastName}
+    </div>
+  );
+}
+```
+
 ## hidden
 
 - `hidden` is a `Decision` object that indicates whether the field is hidden. `hidden` can also be a function. The function's parameters are a `handler` with read-only operations, and the return value is a boolean. The default value is false.

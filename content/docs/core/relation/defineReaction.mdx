@@ -1,11 +1,11 @@
 ---
-title: Basic Reactions
-description: Define field dependencies and implement reactive data flow
+title: Basic Reaction
+description: Define field reaction relationships to implement reactive data flow
 ---
 
 ## Overview
 
-`defineReaction` is used to define reactive relationships between fields. When dependency fields change, it automatically triggers update logic for target fields.
+`defineReaction` is used to define reaction relationships between fields. When dependency fields change, it automatically triggers the update logic of target fields.
 
 ## Basic Usage
 
@@ -14,7 +14,7 @@ import { defineReaction } from '@signals-form/core'
 
 const reaction = defineReaction({
   field: targetField,           // Target field
-  dependencies: [sourceField],  // Array of dependency fields
+  dependencies: [sourceField],  // Dependency field array
   update: (handler, values) => {
     // Update logic
     handler.setState('value', values[0])
@@ -28,9 +28,9 @@ const reaction = defineReaction({
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `field` | `Field\|string` | ✅ | Target field (the field being updated) |
-| `dependencies` | `(Field\|string)[]` | ✅ | Array of dependency fields (fields that trigger updates) |
-| `update` | `UpdateFunction` | ✅ | Update function for reactive behavior |
+| `field` | `Field\|string` | ✅ | Target field (field to be reacted) |
+| `dependencies` | `(Field\|string)[]` | ✅ | Dependency field array (fields that trigger reactions) |
+| `update` | `UpdateFunction` | ✅ | Reaction update function |
 | `options` | `Options` | ❌ | Configuration options |
 
 ### Options Configuration
@@ -39,21 +39,21 @@ const reaction = defineReaction({
 |--------|------|---------|-------------|
 | `immediate` | `boolean` | `false` | Whether to execute immediately (trigger on initialization) |
 | `once` | `boolean` | `false` | Whether to execute only once |
-| `dirtyIgnore` | `boolean` | `false` | Whether to ignore dirty value checks (skip duplicate execution optimization) |
+| `dirtyIgnore` | `boolean` | `true` | Whether to ignore dirty value updates (optimization to skip multiple executions) |
 
 ### Update Function
 
 ```ts
 type UpdateFunction = (
-  handler: FieldHandler,     // Handler for the target field
-  values: any[],            // Array of dependency field values
-  abortSignal: AbortSignal  // Cancellation signal
+  handler: FieldHandler,     // Operation handle for target field
+  values: any[],            // Value array of dependency fields
+  abortSignal: AbortSignal  // Abort signal
 ) => void | Promise<any>
 ```
 
 ### Automatic Dependency Collection
 
-`defineReaction` supports functional calls with automatic dependency collection:
+`defineReaction` supports functional calls with automatic dependency collection and execution:
 
 ```ts
 const reaction = defineReaction((handler) => {
@@ -86,7 +86,7 @@ const usernameReaction = defineReaction({
 
 ### Async Reaction
 
-```ts title="Fetch districts based on city"
+```ts title="Get district list based on city"
 const districtReaction = defineReaction({
   field: district,
   dependencies: [city],
@@ -122,9 +122,9 @@ const totalReaction = defineReaction({
 })
 ```
 
-### Many-to-Many Reactions
+### Many-to-Many Reaction
 
-Supports multiple fields updating multiple target fields simultaneously, but use with caution - prefer many-to-one patterns:
+Supports multiple fields updating multiple target fields simultaneously, but use with caution - prefer many-to-one approach:
 
 ```ts title="Many-to-many dependency updates"
 const multiTargetReaction = defineReaction({
@@ -143,7 +143,7 @@ const multiTargetReaction = defineReaction({
 })
 ```
 
-> ⚠️ **Warning**: Minimize many-to-many scenarios. Prefer many-to-one patterns for better maintainability and debugging.
+> ⚠️ **Note**: Try to minimize many-to-many usage scenarios. Prefer many-to-one approaches for reaction logic as they are easier to maintain and debug.
 
 ### One-time Reaction
 
@@ -167,29 +167,29 @@ const initReaction = defineReaction({
 
 ### Dirty Value Check Control
 
-By default, the system skips duplicate updates with identical values for performance optimization. Use `dirtyIgnore` to bypass this optimization:
+By default, the system skips redundant updates for performance optimization. Use `dirtyIgnore` to bypass this optimization:
 
 ```ts
 const cacheReaction = defineReaction({
   field: cache,
   dependencies: [input],
   update: (handler, [inputValue]) => {
-    // With dirtyIgnore: true, update executes even with identical input values
+    // With dirtyIgnore: true, when triggered multiple times, only the last execution takes effect
     handler.setState('value', `cached_${inputValue}_${Date.now()}`)
   },
   options: {
-    dirtyIgnore: true  // Ignore dirty checks, execute update even with identical values
+    dirtyIgnore: true // When triggered multiple times, only the last execution takes effect
   }
 })
 ```
 
 **How it works:**
-- `dirtyIgnore: false` (default): Skip update function execution if dependency field values haven't changed
-- `dirtyIgnore: true`: Execute update function regardless of whether dependency field values have changed
+- `dirtyIgnore: true` (default): When executed multiple times, skips previous executions and only the last one takes effect
+- `dirtyIgnore: false`: When executed multiple times, each execution runs the update function
 
 ### Canceling Async Operations
 
-For async updates, the system automatically provides AbortSignal to cancel outdated requests:
+For async update operations, the system automatically provides AbortSignal to cancel outdated requests:
 
 ```ts
 const searchReaction = defineReaction({
@@ -201,9 +201,9 @@ const searchReaction = defineReaction({
       return
     }
 
-    // Listen for cancellation signal
+    // Listen for abort signal
     abortSignal?.addEventListener('abort', () => {
-      console.log('Search request was cancelled')
+      console.log('Search request cancelled')
     })
 
     try {
@@ -224,10 +224,10 @@ const searchReaction = defineReaction({
 
 ## Important Notes
 
-1. **Circular Dependencies**: The system supports circular dependencies, but ensure you don't modify the `value` property in update functions to avoid infinite loops
-2. **Performance Considerations**: Default dirty value checking helps optimize performance. Avoid setting `dirtyIgnore: true` unless necessary (e.g., updates based on timestamps or other dynamic values)
-3. **Async Handling**: For async updates, always handle AbortSignal to prevent memory leaks and race conditions
-4. **Many-to-Many Reactions**: Avoid many-to-many reactive patterns when possible; prefer many-to-one approaches
+1. **Circular Dependencies**: The system supports circular dependencies, but ensure you don't modify the `value` property in update functions, as this will cause infinite loops
+2. **Performance Considerations**: Default dirty value checking helps with performance optimization. Unless necessary (e.g., updates based on timestamps or dynamic values), avoid setting `dirtyIgnore: false`
+3. **Async Handling**: For async updates, always handle AbortSignal to avoid memory leaks and race conditions
+4. **Many-to-Many Reactions**: Avoid many-to-many reaction patterns when possible. Prefer many-to-one approaches
 
 ## Type Definitions
 
@@ -240,13 +240,13 @@ export interface Reaction<
 > {
   /** Target field */
   field: Dependency<T, P, E>;
-  /** Array of dependency fields */
+  /** Dependency field array */
   dependencies: [...D];
   /**
    * Update function called when dependencies change
-   * @param handler - Field operation handler
-   * @param depValues - Array of dependency field values
-   * @param signal - Cancellation signal
+   * @param handler - Field operation handle
+   * @param depValues - Value array of dependency fields
+   * @param signal - Abort signal
    */
   update: (
     handler: FieldHandler<T, P>,
@@ -258,10 +258,10 @@ export interface Reaction<
     once?: boolean;
     /** Whether to trigger immediately */
     immediate?: boolean;
-    /** Whether to ignore dirty value checks, skip duplicate value updates, defaults to false */
+    /** Whether to ignore dirty value checks, skip multiple execution value updates, default is true */
     dirtyIgnore?: boolean;
   };
 }
 ```
 
-Basic reactions are the fundamental reactive pattern, suitable for most scenarios. For more advanced control capabilities, consider using
+Basic reactions are the most fundamental reaction type, suitable for most scenarios. For more advanced control capabilities, consider using `defineRelation` controlled reactions.

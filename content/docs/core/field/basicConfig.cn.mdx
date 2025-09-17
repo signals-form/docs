@@ -98,6 +98,69 @@ const account = defineField({
 })
 ```
 
+## 插槽模式
+- 插槽模式是指字段的子字段的在组件中的渲染方式。默认情况下，子字段会作为组件的子元素渲染在组件中。当字段的 `slotMode` 为 `true` 时，表示字段的子字段会作为组件的 `props` 传递给组件，让组件自己决定如何渲染子字段。
+- `slotName`: 插槽的名称，用于在表单中标识插槽。默认为字段的 `id`
+- `slotMode`: 插槽的模式，用于控制插槽的渲染方式。
+
+```ts
+const firstName = defineField({
+	id: "firstName",
+	component: Input,
+	props: {
+		label: "firstName",
+		prefix: "👤",
+		required: true,
+	},
+});
+
+const lastName = defineField({
+	id: "lastName",
+	component: Input,
+	props: {
+		label: "lastName",
+		prefix: "👤",
+		required: true,
+	},
+});
+
+const usernameLayout = defineVoidField({
+	id: "usernameLayout",
+	component: Flex,
+	slotMode: true,
+	hidden: (handler) => {
+		return handler.queryState(age)?.value > 18;
+	},
+	properties: [firstName, lastName],
+	props: {
+		vertical: false,
+	}
+});
+
+function Flex(props: {
+  firstName?: RectNode;
+  lastName?: RectNode;
+  vertical?: boolean;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: props.vertical ? "column" : "row",
+        alignItems: "center",
+        gap: 8,
+      }}
+    >
+    {props.firstName}
+		{props.lastName}
+    </div>
+  );
+}
+
+```
+
+
+
 ## hidden
 
 - `hidden` 是一个 `Decision` 对象，表示字段是否禁用。`hidden` 也可以是一个函数。函数的参数是，仅具备读操作的 `handler` ，返回值是一个布尔值。默认值是 false。

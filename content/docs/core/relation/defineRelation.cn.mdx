@@ -53,7 +53,7 @@ const relation = defineRelation({
 |------|------|--------|------|
 | `isImmediate` | `boolean` | `false` | 是否立即执行（初始化时就触发） |
 | `once` | `boolean` | `false` | 是否只执行一次 |
-| `dirtyIgnore` | `boolean` | `false` | 是否忽略脏值更新（总是执行更新） |
+| `dirtyIgnore` | `boolean` | `true` | 是否忽略脏值更新（总是执行更新） |
 
 ### 更新函数
 
@@ -340,7 +340,7 @@ export interface Relation<
 		once?: boolean;
 		/** If true, the reaction will be triggered immediately */
 		immediate?: boolean;
-		/** If true, the reaction will be allowed to skip updates multiple times, default is false */
+		/** If true, the reaction will be allowed to skip updates multiple times, default is true */
 		dirtyIgnore?: boolean;
 		// support for debounce and throttle ?
 	};
@@ -352,6 +352,5 @@ export interface Relation<
 1. **合理设置依赖** - 只依赖真正需要的字段
 2. **使用 AbortSignal** - 及时取消无效的异步操作
 3. **避免循环依赖** - 检查字段依赖关系图
-4. **适当使用 dirtyIgnore** - 在需要时忽略脏值检查
 
 受控联动是 Signals Form 的核心特性，让复杂的字段关系变得简单可控！✨
