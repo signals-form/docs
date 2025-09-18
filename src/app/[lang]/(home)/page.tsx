@@ -204,15 +204,14 @@ export function ContactForm() {
                   {t.hero.getStarted}
                 </button>
               </DynamicLink>
-
-              <DynamicLink href="https://github.com/CCherry07">
+              {/* <DynamicLink href="https://github.com/CCherry07">
                 <button 
                   type="button"
                   className="cursor-pointer border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white px-8 py-3 rounded-2xl font-semibold text-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-all duration-300"
                 >
                   {t.hero.starGithub}
                 </button>
-              </DynamicLink>
+              </DynamicLink> */}
             </div>
 
             <div className="mt-8">

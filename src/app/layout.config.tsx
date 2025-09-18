@@ -66,6 +66,6 @@ export function baseOptions({ lang }: { lang: string }): BaseLayoutProps {
       ),
       transparentMode: "top",
     },
-    githubUrl: "https://github.com/CCherry07",
+    githubUrl: "https://github.com",
   };
 }
