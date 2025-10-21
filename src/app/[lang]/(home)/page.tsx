@@ -472,12 +472,12 @@ export function ContactForm() {
                 </div>
               }
             >
-              <iframe
+              {/* <iframe
                 className="w-full h-200 border-0"
                 src="https://stackblitz.com/edit/signals-form-mmjycpjj?file=src%2FApp.tsx&terminal=dev"
                 loading="lazy"
                 title="Signals Form Live Demo"
-              />
+              /> */}
             </Suspense>
           </div>
         </div>
