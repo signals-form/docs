@@ -39,7 +39,6 @@ const reaction = defineReaction({
 |------|------|--------|------|
 | `immediate` | `boolean` | `false` | 是否立即执行（初始化时就触发） |
 | `once` | `boolean` | `false` | 是否只执行一次 |
-| `dirtyIgnore` | `boolean` | `true` | 是否忽略脏值更新（跳过多次执行的优化） |
 
 ### 更新函数
 
@@ -47,7 +46,6 @@ const reaction = defineReaction({
 type UpdateFunction = (
   handler: FieldHandler,     // 目标字段的操作句柄
   values: any[],            // 依赖字段的值数组
-  abortSignal: AbortSignal  // 取消信号
 ) => void | Promise<any>
 ```
 
@@ -90,17 +88,15 @@ const usernameReaction = defineReaction({
 const districtReaction = defineReaction({
   field: district,
   dependencies: [city],
-  update: async (handler, [cityId], abortSignal) => {
+  update: async (handler, [cityId]) => {
     if (!cityId) return
     
     try {
-      const districts = await fetchDistricts(cityId, { signal: abortSignal })
+      const districts = await fetchDistricts(cityId)
       handler.setState('options', districts)
       handler.setState('value', '') // 重置选中值
     } catch (error) {
-      if (!abortSignal?.aborted) {
-        console.error('获取区域失败:', error)
-      }
+      console.error('获取区域失败:', error)
     }
   }
 })
@@ -165,103 +161,8 @@ const initReaction = defineReaction({
 
 ## 高级特性
 
-### 脏值检查控制
-
-默认情况下，为了优化性能，系统会跳过重复更新。使用 `dirtyIgnore` 可以跳过这个优化：
-
-```ts
-const cacheReaction = defineReaction({
-  field: cache,
-  dependencies: [input],
-  update: (handler, [inputValue]) => {
-    // 设置 dirtyIgnore: true 后，多次触发时，只有最后一次生效
-    handler.setState('value', `cached_${inputValue}_${Date.now()}`)
-  },
-  options: {
-    dirtyIgnore: true // 多次触发时，只有最后一次生效
-  }
-})
-```
-
-**工作原理：**
-- `dirtyIgnore: true`（默认）：当多次执行时，会跳过前面的执行，只有最后一次执行会生效
-- `dirtyIgnore: false`：当多次执行时，每次都会执行更新函数
-
-### 取消异步操作
-
-对于异步更新操作，系统会自动提供 AbortSignal 来取消过期的请求：
-
-```ts
-const searchReaction = defineReaction({
-  field: searchResults,
-  dependencies: [keyword],
-  update: async (handler, [keyword], abortSignal) => {
-    if (!keyword?.trim()) {
-      handler.setState('value', [])
-      return
-    }
-
-    // 监听取消信号
-    abortSignal?.addEventListener('abort', () => {
-      console.log('搜索请求被取消')
-    })
-
-    try {
-      const results = await searchAPI(keyword, { signal: abortSignal })
-      
-      // 检查是否已被取消
-      if (!abortSignal?.aborted) {
-        handler.setState('value', results)
-      }
-    } catch (error) {
-      if (error.name !== 'AbortError') {
-        console.error('搜索失败:', error)
-      }
-    }
-  }
-})
-```
 
 ## 注意事项
 
 1. **循环依赖**：系统支持循环依赖，但请确保不要在更新函数中修改 `value` 属性，否则会造成无限循环
-2. **性能考虑**：默认的脏值检查有助于性能优化，除非必要（如需要基于时间戳等动态值更新），不建议设置 `dirtyIgnore: false`
-3. **异步处理**：对于异步更新，务必处理 AbortSignal 以避免内存泄漏和竞态条件
 4. **多对多联动**：尽量避免多对多的联动模式，优先使用多对一的方式
-
-## 类型定义
-
-```ts
-export interface Reaction<
-  T = any,
-  P extends Props = Props,
-  E extends string = string,
-  D extends Dependencies = any,
-> {
-  /** 目标字段 */
-  field: Dependency<T, P, E>;
-  /** 依赖字段数组 */
-  dependencies: [...D];
-  /**
-   * 更新函数，当依赖变化时被调用
-   * @param handler - 字段操作句柄
-   * @param depValues - 依赖字段的值数组
-   * @param signal - 取消信号
-   */
-  update: (
-    handler: FieldHandler<T, P>,
-    depValues: GetDependencyValues<D>,
-    signal: AbortSignal,
-  ) => void | Promise<void | T> | T | Promise<T>;
-  options?: {
-    /** 是否只触发一次 */
-    once?: boolean;
-    /** 是否立即触发 */
-    immediate?: boolean;
-    /** 是否忽略脏值检查，跳过多次执行的值更新，默认为 false */
-    dirtyIgnore?: boolean;
-  };
-}
-```
-
-普通联动为最基础的联动方式，适用于大多数场景。如需更高级的控制能力，请考虑使用 `defineRelation` 受控联动

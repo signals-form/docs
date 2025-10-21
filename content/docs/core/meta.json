@@ -32,7 +32,6 @@
     "schema",
     "---Global State Management---",
     "store/store",
-    "store/store-plugin",
     "---Hot Configuration---",
     "hot-config",
     "---Draft State---",
